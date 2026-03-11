@@ -8,5 +8,9 @@ module.exports = {
     '^./lib/prisma$': '<rootDir>/tests/__mocks__/prisma.js',
     '^../lib/shopifyClient$': '<rootDir>/tests/__mocks__/shopifyClient.js',
     '^./lib/shopifyClient$': '<rootDir>/tests/__mocks__/shopifyClient.js',
+    '^./shopifyClient$': '<rootDir>/tests/__mocks__/shopifyClient.js',
+    '^../lib/profitEngine$': '<rootDir>/tests/__mocks__/profitEngine.js',
+    '^./lib/profitEngine$': '<rootDir>/tests/__mocks__/profitEngine.js',
+    '^./profitEngine$': '<rootDir>/tests/__mocks__/profitEngine.js',
   },
 };

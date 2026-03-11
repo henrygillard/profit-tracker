@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 02-sync-and-profit-engine 02-02-PLAN.md
-last_updated: "2026-03-11T15:25:24.210Z"
+stopped_at: Completed 02-sync-and-profit-engine 02-05-PLAN.md
+last_updated: "2026-03-11T18:35:57.818Z"
 last_activity: 2026-03-10 — Roadmap created, phases derived from requirements
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 10
-  completed_plans: 7
+  completed_plans: 9
   percent: 25
 ---
 
@@ -57,6 +57,8 @@ Progress: [███░░░░░░░] 25%
 | Phase 02-sync-and-profit-engine P01 | 202 | 2 tasks | 8 files |
 | Phase 02-sync-and-profit-engine P03 | 7 | 2 tasks | 6 files |
 | Phase 02-sync-and-profit-engine P02 | 10 | 2 tasks | 6 files |
+| Phase 02-sync-and-profit-engine P05 | 5 | 2 tasks | 2 files |
+| Phase 02-sync-and-profit-engine P06 | 5 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -84,6 +86,8 @@ Recent decisions affecting current work:
 - [Phase 02-sync-and-profit-engine]: Added './shopifyClient' (sibling-require pattern) to jest.config.js moduleNameMapper for lib/ modules requiring siblings
 - [Phase 02-sync-and-profit-engine]: Removed profitEngine from jest.config.js moduleNameMapper — sync.test.js uses jest.mock() inline; global mapping blocked profit.test.js from reaching real module
 - [Phase 02-sync-and-profit-engine]: revenueNet = currentTotalPrice - totalRefunded (explicit subtraction); proportional COGS denominator is itemsTotal (lineItems sum), not currentTotalPrice
+- [Phase 02-sync-and-profit-engine]: CSV imports store variantId=sku as placeholder — SKU-only entries valid per COGS-03, variantId can be null
+- [Phase 02-sync-and-profit-engine]: Sub-millisecond effectiveFrom offset (now + imported count) prevents unique constraint collision on same-second CSV batch
 
 ### Pending Todos
 
@@ -98,6 +102,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-11T15:25:24.202Z
-Stopped at: Completed 02-sync-and-profit-engine 02-02-PLAN.md
+Last session: 2026-03-11T18:35:50.367Z
+Stopped at: Completed 02-sync-and-profit-engine 02-05-PLAN.md
 Resume file: None

@@ -16,24 +16,24 @@ Requirements for MVP launch. Each maps to roadmap phases.
 
 ### Data Sync
 
-- [ ] **SYNC-01**: On first install, app syncs full order history via Shopify GraphQL Bulk Operations
-- [ ] **SYNC-02**: App receives and processes `orders/paid`, `orders/updated`, `orders/cancelled`, `orders/refunded` webhooks for real-time sync
-- [ ] **SYNC-03**: App runs a 15-minute background polling job as reliability backstop for missed webhooks
-- [ ] **SYNC-04**: App syncs Shopify Payments payout data to obtain exact transaction fee amounts per order
+- [x] **SYNC-01**: On first install, app syncs full order history via Shopify GraphQL Bulk Operations
+- [x] **SYNC-02**: App receives and processes `orders/paid`, `orders/updated`, `orders/cancelled`, `orders/refunded` webhooks for real-time sync
+- [x] **SYNC-03**: App runs a 15-minute background polling job as reliability backstop for missed webhooks
+- [x] **SYNC-04**: App syncs Shopify Payments payout data to obtain exact transaction fee amounts per order
 
 ### COGS Management
 
-- [ ] **COGS-01**: Merchant can manually enter cost (COGS) per product variant from the dashboard
-- [ ] **COGS-02**: App auto-populates COGS from Shopify's `inventoryItem.unitCost` field where merchant has set it
-- [ ] **COGS-03**: Merchant can bulk-import COGS via CSV upload (SKU, cost columns)
-- [ ] **COGS-04**: COGS is stored as a time-series per variant — cost changes do not retroactively rewrite historical profit
+- [x] **COGS-01**: Merchant can manually enter cost (COGS) per product variant from the dashboard
+- [x] **COGS-02**: App auto-populates COGS from Shopify's `inventoryItem.unitCost` field where merchant has set it
+- [x] **COGS-03**: Merchant can bulk-import COGS via CSV upload (SKU, cost columns)
+- [x] **COGS-04**: COGS is stored as a time-series per variant — cost changes do not retroactively rewrite historical profit
 
 ### Fee Calculation
 
-- [ ] **FEES-01**: App auto-detects merchant's Shopify plan and applies correct transaction fee rate (0% for Shopify Payments, 0.15%–2% for external gateways based on plan)
-- [ ] **FEES-02**: App calculates payment processor fees using exact amounts from Shopify Payments payout data; merchant can configure rate for third-party gateways
-- [ ] **FEES-03**: App tracks shipping cost per order (manual input; uses Shopify Shipping label cost where API provides it)
-- [ ] **FEES-04**: When an order is refunded, app reverses the COGS attribution and adjusts fee calculations for accurate historical profit
+- [x] **FEES-01**: App auto-detects merchant's Shopify plan and applies correct transaction fee rate (0% for Shopify Payments, 0.15%–2% for external gateways based on plan)
+- [x] **FEES-02**: App calculates payment processor fees using exact amounts from Shopify Payments payout data; merchant can configure rate for third-party gateways
+- [x] **FEES-03**: App tracks shipping cost per order (manual input; uses Shopify Shipping label cost where API provides it)
+- [x] **FEES-04**: When an order is refunded, app reverses the COGS attribution and adjusts fee calculations for accurate historical profit
 
 ### Profit Dashboard
 
@@ -89,18 +89,18 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FOUND-02 | Phase 1 | Complete |
 | FOUND-03 | Phase 1 | Complete |
 | FOUND-04 | Phase 1 | Complete |
-| SYNC-01 | Phase 2 | Pending |
-| SYNC-02 | Phase 2 | Pending |
-| SYNC-03 | Phase 2 | Pending |
-| SYNC-04 | Phase 2 | Pending |
-| COGS-01 | Phase 2 | Pending |
-| COGS-02 | Phase 2 | Pending |
-| COGS-03 | Phase 2 | Pending |
-| COGS-04 | Phase 2 | Pending |
-| FEES-01 | Phase 2 | Pending |
-| FEES-02 | Phase 2 | Pending |
-| FEES-03 | Phase 2 | Pending |
-| FEES-04 | Phase 2 | Pending |
+| SYNC-01 | Phase 2 | Complete |
+| SYNC-02 | Phase 2 | Complete |
+| SYNC-03 | Phase 2 | Complete |
+| SYNC-04 | Phase 2 | Complete |
+| COGS-01 | Phase 2 | Complete |
+| COGS-02 | Phase 2 | Complete |
+| COGS-03 | Phase 2 | Complete |
+| COGS-04 | Phase 2 | Complete |
+| FEES-01 | Phase 2 | Complete |
+| FEES-02 | Phase 2 | Complete |
+| FEES-03 | Phase 2 | Complete |
+| FEES-04 | Phase 2 | Complete |
 | DASH-01 | Phase 3 | Pending |
 | DASH-02 | Phase 3 | Pending |
 | DASH-03 | Phase 3 | Pending |

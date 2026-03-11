@@ -47,7 +47,15 @@ Plans:
   4. An order processed via Shopify Payments shows the correct transaction fee amount (from payout data); an order processed via a third-party gateway uses the merchant-configured rate
   5. When an order is refunded, the profit record is updated to reverse COGS and fee attributions — the dashboard never shows inflated historical profit for a refunded order
   6. Products with no COGS entered are never calculated as $0 cost — the system tracks them as "unknown" and the profit figure for those orders is flagged, not fabricated
-**Plans**: TBD
+**Plans**: 6 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Foundation: schema extension (5 new Prisma models), package installs, test scaffolds
+- [ ] 02-02-PLAN.md — TDD: shopifyClient.js and profitEngine.js pure functions (COGS-04, FEES-01, FEES-02, FEES-03, FEES-04)
+- [ ] 02-03-PLAN.md — Sync libs: syncOrders.js, scheduler.js, wire startScheduler into server.js (SYNC-01, SYNC-02, SYNC-03)
+- [ ] 02-04-PLAN.md — Webhooks: 5 order handlers + webhook registration in OAuth callback (SYNC-02, FEES-04)
+- [ ] 02-05-PLAN.md — COGS API: POST /api/cogs manual entry + POST /api/cogs/csv bulk import (COGS-01, COGS-02, COGS-03)
+- [ ] 02-06-PLAN.md — Payout sync: syncPayouts.js + POST /api/sync/payouts trigger (SYNC-04)
 
 ### Phase 3: Profit Dashboard
 **Goal**: Merchants see what they actually kept within 10 minutes of installing — a working React dashboard embedded in Shopify Admin showing profit at store, order, and product level
@@ -79,6 +87,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Data Foundation | 4/4 | Complete   | 2026-03-11 |
-| 2. Sync and Profit Engine | 0/TBD | Not started | - |
+| 2. Sync and Profit Engine | 1/6 | In Progress|  |
 | 3. Profit Dashboard | 0/TBD | Not started | - |
 | 4. Billing | 0/TBD | Not started | - |

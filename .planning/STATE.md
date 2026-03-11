@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 01-data-foundation 01-03-PLAN.md
-last_updated: "2026-03-11T03:37:10.168Z"
+stopped_at: Completed 02-sync-and-profit-engine 02-01-PLAN.md
+last_updated: "2026-03-11T15:11:32.916Z"
 last_activity: 2026-03-10 — Roadmap created, phases derived from requirements
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 10
+  completed_plans: 5
   percent: 25
 ---
 
@@ -54,6 +54,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 01-data-foundation P02 | 5min | 1 tasks | 1 files |
 | Phase 01-data-foundation P04 | 138 | 1 tasks | 2 files |
 | Phase 01-data-foundation P03 | 5 | 2 tasks | 4 files |
+| Phase 02-sync-and-profit-engine P01 | 202 | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,9 @@ Recent decisions affecting current work:
 - [Phase 01-data-foundation]: Phase 2 scopes documented as inline comments in toml; read_all_orders requires pre-approval before Phase 2 starts
 - [Phase 01-data-foundation]: Export verifySessionToken as dual module.exports/named export for test + destructured usage compatibility
 - [Phase 01-data-foundation]: req.shopDomain set from payload.dest hostname — never from req.query.shop (Shopify App Review requirement)
+- [Phase 02-sync-and-profit-engine]: node-cron/multer/csv-parser installed as production dependencies — required at runtime for scheduling, file upload, and CSV parsing
+- [Phase 02-sync-and-profit-engine]: shopifyClient mock registered via moduleNameMapper with both ../ and ./ path variants — consistent with existing prisma mock pattern
+- [Phase 02-sync-and-profit-engine]: COGS time-series via insert-only ProductCost rows (NEVER update) — cogsTotal NULL signals unknown COGS, propagates to netProfit=NULL
 
 ### Pending Todos
 
@@ -88,6 +92,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-11T03:32:07.925Z
-Stopped at: Completed 01-data-foundation 01-03-PLAN.md
+Last session: 2026-03-11T15:11:32.908Z
+Stopped at: Completed 02-sync-and-profit-engine 02-01-PLAN.md
 Resume file: None

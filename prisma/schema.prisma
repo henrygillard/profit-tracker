@@ -17,6 +17,7 @@ model ShopSession {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
+  @@index([shop])
   @@map("shop_sessions")
 }
 
@@ -26,4 +27,93 @@ model OAuthState {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("oauth_states")
+}
+
+// Order — core order record from Shopify
+model Order {
+  id                String      @id                // Shopify GID: gid://shopify/Order/12345
+  shop              String
+  shopifyOrderName  String      @map("shopify_order_name") // e.g. "#1001"
+  processedAt       DateTime    @map("processed_at")
+  financialStatus   String      @map("financial_status")
+  totalPrice        Decimal     @map("total_price")         @db.Decimal(12, 2)
+  currentTotalPrice Decimal     @map("current_total_price") @db.Decimal(12, 2)
+  totalRefunded     Decimal     @default(0) @map("total_refunded") @db.Decimal(12, 2)
+  shippingCost      Decimal     @default(0) @map("shipping_cost")  @db.Decimal(12, 2)
+  paymentGateway    String      @map("payment_gateway")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  lineItems         LineItem[]
+  profit            OrderProfit?
+
+  @@index([shop, processedAt])
+  @@map("orders")
+}
+
+// LineItem — individual product line within an order
+model LineItem {
+  id        String   @id              // Shopify GID
+  orderId   String   @map("order_id")
+  variantId String?  @map("variant_id") // nullable: custom line items have no variant
+  sku       String?
+  quantity  Int
+  unitPrice Decimal  @map("unit_price") @db.Decimal(12, 2)
+
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([variantId])
+  @@map("line_items")
+}
+
+// ProductCost — COGS time-series per variant
+// NEVER update rows — insert a new row when cost changes (COGS-04)
+model ProductCost {
+  id            Int      @id @default(autoincrement())
+  shop          String
+  variantId     String   @map("variant_id")
+  sku           String?
+  costAmount    Decimal  @map("cost_amount") @db.Decimal(12, 2)
+  effectiveFrom DateTime @map("effective_from") @default(now())
+  source        String   @default("manual") // "manual" | "shopify" | "csv"
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([shop, variantId, effectiveFrom])
+  @@index([shop, variantId, effectiveFrom])
+  @@map("product_costs")
+}
+
+// OrderProfit — write-time profit snapshot per order
+// cogsTotal is NULL (not 0) when any line item has unknown COGS
+model OrderProfit {
+  id            Int      @id @default(autoincrement())
+  orderId       String   @unique @map("order_id")
+  shop          String
+  revenueNet    Decimal  @map("revenue_net")  @db.Decimal(12, 2) // currentTotalPrice after refunds
+  cogsTotal     Decimal? @map("cogs_total")   @db.Decimal(12, 2) // NULL = unknown COGS
+  feesTotal     Decimal  @map("fees_total")   @db.Decimal(12, 2)
+  shippingCost  Decimal  @map("shipping_cost") @db.Decimal(12, 2)
+  netProfit     Decimal? @map("net_profit")   @db.Decimal(12, 2) // NULL when cogsTotal is NULL
+  cogsKnown     Boolean  @default(false) @map("cogs_known")
+  calculatedAt  DateTime @default(now()) @map("calculated_at")
+
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([shop])
+  @@map("order_profits")
+}
+
+// ShopConfig — per-shop configuration and sync state
+model ShopConfig {
+  id                     Int      @id @default(autoincrement())
+  shop                   String   @unique
+  shopifyPlan            String?  @map("shopify_plan")           // publicDisplayName from Shopify
+  thirdPartyFeeRate      Decimal? @map("third_party_fee_rate")   @db.Decimal(6, 4) // e.g. 0.02
+  lastOrderSyncedAt      DateTime? @map("last_order_synced_at")  // cursor for incremental sync
+  bulkOpId               String?  @map("bulk_op_id")             // in-flight bulk operation GID
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  @@map("shop_configs")
 }

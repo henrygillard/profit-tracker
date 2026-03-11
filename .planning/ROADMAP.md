@@ -28,7 +28,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. The app's OAuth scopes list contains only the scopes actually used by the application — no excess scopes that trigger App Review rejection
   3. Starting the server with a missing required environment variable prints a clear error message and exits — no silent failures
   4. Every `/api/*` request without a valid App Bridge JWT returns 401; a valid request extracts shop identity from the token, not the query string
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Test infrastructure: install Jest + Supertest, write failing test scaffolds for all four requirements
+- [ ] 01-02-PLAN.md — GDPR real handlers: replace three webhook stubs with HMAC-verified Prisma operations (FOUND-01)
+- [ ] 01-03-PLAN.md — JWT middleware: create verifySessionToken, protected /api routes, mount in server.js (FOUND-04)
+- [ ] 01-04-PLAN.md — Scope pruning + env validation: set toml scopes to empty, add SHOPIFY_SCOPES to startup check (FOUND-02, FOUND-03)
 
 ### Phase 2: Sync and Profit Engine
 **Goal**: Merchants' orders, products, and payout data flow into the local database with profit, fees, and COGS calculated correctly at write time — the numbers are trustworthy before any UI exists
@@ -72,7 +78,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Data Foundation | 0/TBD | Not started | - |
+| 1. Data Foundation | 0/4 | Not started | - |
 | 2. Sync and Profit Engine | 0/TBD | Not started | - |
 | 3. Profit Dashboard | 0/TBD | Not started | - |
 | 4. Billing | 0/TBD | Not started | - |

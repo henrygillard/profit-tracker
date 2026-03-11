@@ -9,10 +9,10 @@ Requirements for MVP launch. Each maps to roadmap phases.
 
 ### Foundation
 
-- [ ] **FOUND-01**: App implements GDPR webhooks (customer data erasure, customer data request, shop redact) with real handlers — not stubs
-- [ ] **FOUND-02**: App OAuth scopes pruned to minimum required — removes excess scopes that cause app review rejection
-- [ ] **FOUND-03**: Server validates all required environment variables at startup and fails fast with clear errors if missing
-- [ ] **FOUND-04**: All `/api/*` routes validate Shopify App Bridge session tokens (JWT) — shop identity extracted from token, not query string
+- [x] **FOUND-01**: App implements GDPR webhooks (customer data erasure, customer data request, shop redact) with real handlers — not stubs
+- [x] **FOUND-02**: App OAuth scopes pruned to minimum required — removes excess scopes that cause app review rejection
+- [x] **FOUND-03**: Server validates all required environment variables at startup and fails fast with clear errors if missing
+- [x] **FOUND-04**: All `/api/*` routes validate Shopify App Bridge session tokens (JWT) — shop identity extracted from token, not query string
 
 ### Data Sync
 
@@ -85,10 +85,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-01 | Phase 1 | Pending |
-| FOUND-02 | Phase 1 | Pending |
-| FOUND-03 | Phase 1 | Pending |
-| FOUND-04 | Phase 1 | Pending |
+| FOUND-01 | Phase 1 | Complete |
+| FOUND-02 | Phase 1 | Complete |
+| FOUND-03 | Phase 1 | Complete |
+| FOUND-04 | Phase 1 | Complete |
 | SYNC-01 | Phase 2 | Pending |
 | SYNC-02 | Phase 2 | Pending |
 | SYNC-03 | Phase 2 | Pending |

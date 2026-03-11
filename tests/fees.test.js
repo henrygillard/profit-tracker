@@ -45,8 +45,48 @@ describe('shipping cost (FEES-03)', () => {
 });
 
 describe('payout fee attribution (SYNC-04)', () => {
+  const { shopifyGraphQL } = require('../lib/shopifyClient');
+  const { syncPayouts } = require('../lib/syncPayouts');
+
   test('syncPayouts writes fee amount to OrderProfit.feesTotal for Shopify Payments orders', async () => {
-    // RED: lib/syncPayouts.js not yet created
-    expect(false).toBe(true, 'implement syncPayouts in lib/syncPayouts.js');
+    // Setup: mock shopifyGraphQL to return one page of balance transactions
+    shopifyGraphQL.mockResolvedValueOnce({
+      shopifyPaymentsAccount: {
+        balanceTransactions: {
+          pageInfo: { hasNextPage: false, endCursor: null },
+          nodes: [
+            { id: 'bt1', type: 'CHARGE', fee: { amount: '2.50' }, associatedOrder: { id: 'gid://shopify/Order/12345' } },
+            { id: 'bt2', type: 'CHARGE', fee: { amount: '1.00' }, associatedOrder: { id: 'gid://shopify/Order/99999' } },
+          ],
+        },
+      },
+    });
+
+    // Setup: mock prisma with orderProfit.update
+    const mockPrisma = {
+      orderProfit: {
+        update: jest.fn().mockResolvedValue({}),
+      },
+    };
+
+    // Call syncPayouts
+    await syncPayouts(mockPrisma, 'test-shop.myshopify.com', 'test-token');
+
+    // Assert: prisma.orderProfit.update called with correct fee for order 12345
+    expect(mockPrisma.orderProfit.update).toHaveBeenCalledWith({
+      where: { orderId: 'gid://shopify/Order/12345' },
+      data: { feesTotal: 2.50 },
+    });
+
+    // Assert: called twice total (once per order)
+    expect(mockPrisma.orderProfit.update).toHaveBeenCalledTimes(2);
+
+    // Assert: shopifyGraphQL was called with a query containing 'balanceTransactions'
+    expect(shopifyGraphQL).toHaveBeenCalledWith(
+      'test-shop.myshopify.com',
+      'test-token',
+      expect.stringContaining('balanceTransactions'),
+      expect.any(Object),
+    );
   });
 });

@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 02-sync-and-profit-engine 02-05-PLAN.md
-last_updated: "2026-03-11T18:35:57.818Z"
+stopped_at: Completed 02-sync-and-profit-engine 02-06-PLAN.md
+last_updated: "2026-03-11T18:41:50.018Z"
 last_activity: 2026-03-10 — Roadmap created, phases derived from requirements
 progress:
   total_phases: 4
@@ -88,6 +88,9 @@ Recent decisions affecting current work:
 - [Phase 02-sync-and-profit-engine]: revenueNet = currentTotalPrice - totalRefunded (explicit subtraction); proportional COGS denominator is itemsTotal (lineItems sum), not currentTotalPrice
 - [Phase 02-sync-and-profit-engine]: CSV imports store variantId=sku as placeholder — SKU-only entries valid per COGS-03, variantId can be null
 - [Phase 02-sync-and-profit-engine]: Sub-millisecond effectiveFrom offset (now + imported count) prevents unique constraint collision on same-second CSV batch
+- [Phase 02-sync-and-profit-engine]: syncPayouts filters CHARGE type only — REFUND transactions excluded; totalRefunded already handles revenue adjustment
+- [Phase 02-sync-and-profit-engine]: Sum multiple CHARGE transactions per order before updating — partial capture creates multiple CHARGE nodes for same associatedOrder.id
+- [Phase 02-sync-and-profit-engine]: syncPayouts is idempotent — repeated calls overwrite feesTotal with same computed value, safe to call after OAuth
 
 ### Pending Todos
 
@@ -102,6 +105,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-11T18:35:50.367Z
-Stopped at: Completed 02-sync-and-profit-engine 02-05-PLAN.md
+Last session: 2026-03-11T18:41:50.013Z
+Stopped at: Completed 02-sync-and-profit-engine 02-06-PLAN.md
 Resume file: None

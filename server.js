@@ -1,8 +1,18 @@
 require('dotenv').config({ path: require('path').join(process.cwd(), '.env') });
 
+// Validate required env vars before anything else
+const REQUIRED_ENV = ['SHOPIFY_API_KEY', 'SHOPIFY_API_SECRET', 'SHOPIFY_APP_URL', 'DATABASE_URL', 'SHOPIFY_SCOPES'];
+const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
+if (missing.length) {
+  console.error(`Missing required environment variables: ${missing.join(', ')}`);
+  process.exit(1);
+}
+
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 const { prisma } = require('./lib/prisma');
+const { validateShop } = require('./lib/utils');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,11 +23,11 @@ app.set('trust proxy', 1);
 // CSP frame-ancestors scoped per shop (required for Shopify embedded apps)
 app.use((req, res, next) => {
   const shop = req.query.shop || '';
-  const shopDomain = shop.includes('.') ? shop : shop ? `${shop}.myshopify.com` : null;
-  if (shopDomain) {
+  const normalizedShop = shop.includes('.') ? shop : shop ? `${shop}.myshopify.com` : null;
+  if (normalizedShop && validateShop(normalizedShop)) {
     res.setHeader(
       'Content-Security-Policy',
-      `frame-ancestors https://${shopDomain} https://admin.shopify.com`
+      `frame-ancestors https://${normalizedShop} https://admin.shopify.com`
     );
   } else {
     res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
@@ -25,7 +35,12 @@ app.use((req, res, next) => {
   next();
 });
 
+// Rate limiting for OAuth endpoints
+const authLimiter = rateLimit({ windowMs: 60_000, max: 20, standardHeaders: true, legacyHeaders: false });
+app.use('/auth', authLimiter);
+
 // CRITICAL: raw body for webhooks BEFORE json parser — do not change order
+// Changing this order will silently break webhook HMAC verification.
 app.use('/webhooks', express.raw({ type: 'application/json' }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -33,6 +48,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Routes
 app.use('/', require('./routes/auth'));
 app.use('/webhooks', require('./routes/webhooks'));
+
+/**
+ * GET /health — Liveness probe for Railway / uptime monitors
+ */
+app.get('/health', (_req, res) => res.status(200).json({ status: 'ok' }));
 
 /**
  * GET /admin — Main embedded admin UI
@@ -99,6 +119,24 @@ app.get('/', (req, res) => {
 </body></html>`);
 });
 
-app.listen(PORT, () => {
+// Global error handler
+app.use((err, req, res, _next) => {
+  console.error({ message: err.message, stack: err.stack, shop: req.query.shop });
+  res.status(500).send('Internal server error');
+});
+
+// Start server with graceful shutdown
+const server = app.listen(PORT, () => {
   console.log(`profit tracker server running on port ${PORT}`);
 });
+
+async function shutdown(signal) {
+  console.log(`${signal} received — shutting down`);
+  server.close(async () => {
+    await prisma.$disconnect();
+    process.exit(0);
+  });
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

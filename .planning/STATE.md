@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 02-sync-and-profit-engine 02-01-PLAN.md
-last_updated: "2026-03-11T15:11:32.916Z"
+stopped_at: Completed 02-sync-and-profit-engine 02-03-PLAN.md
+last_updated: "2026-03-11T15:21:48.542Z"
 last_activity: 2026-03-10 — Roadmap created, phases derived from requirements
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 10
-  completed_plans: 5
+  completed_plans: 6
   percent: 25
 ---
 
@@ -55,6 +55,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 01-data-foundation P04 | 138 | 1 tasks | 2 files |
 | Phase 01-data-foundation P03 | 5 | 2 tasks | 4 files |
 | Phase 02-sync-and-profit-engine P01 | 202 | 2 tasks | 8 files |
+| Phase 02-sync-and-profit-engine P03 | 7 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,8 @@ Recent decisions affecting current work:
 - [Phase 02-sync-and-profit-engine]: node-cron/multer/csv-parser installed as production dependencies — required at runtime for scheduling, file upload, and CSV parsing
 - [Phase 02-sync-and-profit-engine]: shopifyClient mock registered via moduleNameMapper with both ../ and ./ path variants — consistent with existing prisma mock pattern
 - [Phase 02-sync-and-profit-engine]: COGS time-series via insert-only ProductCost rows (NEVER update) — cogsTotal NULL signals unknown COGS, propagates to netProfit=NULL
+- [Phase 02-sync-and-profit-engine]: profitEngine mock uses jest.mock() with virtual:true inline in sync.test.js — profit.test.js/fees.test.js/cogs.test.js import real lib/profitEngine once Plan 02-02 creates it
+- [Phase 02-sync-and-profit-engine]: Added './shopifyClient' (sibling-require pattern) to jest.config.js moduleNameMapper for lib/ modules requiring siblings
 
 ### Pending Todos
 
@@ -92,6 +95,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-11T15:11:32.908Z
-Stopped at: Completed 02-sync-and-profit-engine 02-01-PLAN.md
+Last session: 2026-03-11T15:21:48.415Z
+Stopped at: Completed 02-sync-and-profit-engine 02-03-PLAN.md
 Resume file: None

@@ -133,4 +133,30 @@ router.post('/cogs/csv', upload.single('file'), async (req, res) => {
   return res.status(200).json({ imported, skipped, errors });
 });
 
+/**
+ * POST /api/sync/payouts — Trigger Shopify Payments payout sync (SYNC-04)
+ * Fetches balance transactions and updates OrderProfit.feesTotal for all Shopify Payments orders.
+ * Idempotent — safe to call multiple times. Runs synchronously (may take 10-30s for large stores).
+ *
+ * Returns: 200 with { message: 'Payout sync complete' } on success
+ */
+router.post('/sync/payouts', async (req, res) => {
+  try {
+    const session = await prisma.shopSession.findFirst({
+      where: { shop: req.shopDomain },
+      select: { accessToken: true },
+    });
+
+    if (!session) {
+      return res.status(404).json({ error: 'Shop session not found — re-install required' });
+    }
+
+    await syncPayouts(prisma, req.shopDomain, session.accessToken);
+    return res.status(200).json({ message: 'Payout sync complete' });
+  } catch (err) {
+    console.error('POST /api/sync/payouts error:', err);
+    return res.status(500).json({ error: 'Payout sync failed: ' + err.message });
+  }
+});
+
 module.exports = router;

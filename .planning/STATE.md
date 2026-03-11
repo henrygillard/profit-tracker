@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 01-data-foundation 01-01-PLAN.md
-last_updated: "2026-03-11T03:26:46.797Z"
+stopped_at: Completed 01-data-foundation 01-02-PLAN.md
+last_updated: "2026-03-11T03:30:40.530Z"
 last_activity: 2026-03-10 — Roadmap created, phases derived from requirements
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
+  completed_plans: 2
   percent: 25
 ---
 
@@ -51,6 +51,7 @@ Progress: [███░░░░░░░] 25%
 
 *Updated after each plan completion*
 | Phase 01-data-foundation P01 | 7 | 2 tasks | 7 files |
+| Phase 01-data-foundation P02 | 5min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -65,6 +66,8 @@ Recent decisions affecting current work:
 - [Phase 01-data-foundation]: Pinned jest@29 (not 30) for Node 16.20.2 compatibility — jest@30 requires os.availableParallelism from Node 18
 - [Phase 01-data-foundation]: env.test.js uses os.tmpdir() as spawnSync cwd to prevent dotenv from loading project .env and restoring deleted env vars
 - [Phase 01-data-foundation]: auth.test.js uses try/catch + moduleLoaded flag for clean loading before lib/verifySessionToken.js is created
+- [Phase 01-data-foundation]: customers/redact and customers/data_request are log-only in Phase 1 (no PII stored) — Phase 2+ annotated for real deletion/export
+- [Phase 01-data-foundation]: shop/redact uses identical deleteMany pattern as app_uninstalled handler for consistent full shop data removal
 
 ### Pending Todos
 
@@ -79,6 +82,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-11T03:26:46.788Z
-Stopped at: Completed 01-data-foundation 01-01-PLAN.md
+Last session: 2026-03-11T03:30:40.473Z
+Stopped at: Completed 01-data-foundation 01-02-PLAN.md
 Resume file: None

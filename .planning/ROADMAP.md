@@ -12,7 +12,7 @@ Four phases with a hard dependency chain. The schema must exist before sync can 
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Data Foundation** - App review blockers cleared, schema extended, all API routes secured with JWT auth
+- [x] **Phase 1: Data Foundation** - App review blockers cleared, schema extended, all API routes secured with JWT auth (completed 2026-03-11)
 - [ ] **Phase 2: Sync and Profit Engine** - Orders, products, and payouts synced; profit calculated correctly at write time
 - [ ] **Phase 3: Profit Dashboard** - React SPA rendering real profit data for merchants within 10 minutes of install
 - [ ] **Phase 4: Billing** - Shopify Billing API enforcing $29/month subscription before granting full access
@@ -78,7 +78,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Data Foundation | 3/4 | In Progress|  |
+| 1. Data Foundation | 4/4 | Complete   | 2026-03-11 |
 | 2. Sync and Profit Engine | 0/TBD | Not started | - |
 | 3. Profit Dashboard | 0/TBD | Not started | - |
 | 4. Billing | 0/TBD | Not started | - |

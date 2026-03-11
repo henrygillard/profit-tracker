@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 01-data-foundation 01-04-PLAN.md
-last_updated: "2026-03-11T03:31:24.551Z"
+stopped_at: Completed 01-data-foundation 01-03-PLAN.md
+last_updated: "2026-03-11T03:32:07.933Z"
 last_activity: 2026-03-10 — Roadmap created, phases derived from requirements
 progress:
   total_phases: 4
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
   percent: 25
 ---
 
@@ -53,6 +53,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 01-data-foundation P01 | 7 | 2 tasks | 7 files |
 | Phase 01-data-foundation P02 | 5min | 1 tasks | 1 files |
 | Phase 01-data-foundation P04 | 138 | 1 tasks | 2 files |
+| Phase 01-data-foundation P03 | 5 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,8 @@ Recent decisions affecting current work:
 - [Phase 01-data-foundation]: shop/redact uses identical deleteMany pattern as app_uninstalled handler for consistent full shop data removal
 - [Phase 01-data-foundation]: Phase 1 scopes set to empty string — App Review requires justification for every scope, no Admin API calls in Phase 1
 - [Phase 01-data-foundation]: Phase 2 scopes documented as inline comments in toml; read_all_orders requires pre-approval before Phase 2 starts
+- [Phase 01-data-foundation]: Export verifySessionToken as dual module.exports/named export for test + destructured usage compatibility
+- [Phase 01-data-foundation]: req.shopDomain set from payload.dest hostname — never from req.query.shop (Shopify App Review requirement)
 
 ### Pending Todos
 
@@ -85,6 +88,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-11T03:31:24.541Z
-Stopped at: Completed 01-data-foundation 01-04-PLAN.md
+Last session: 2026-03-11T03:32:07.925Z
+Stopped at: Completed 01-data-foundation 01-03-PLAN.md
 Resume file: None

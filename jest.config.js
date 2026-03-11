@@ -6,5 +6,7 @@ module.exports = {
   moduleNameMapper: {
     '^../lib/prisma$': '<rootDir>/tests/__mocks__/prisma.js',
     '^./lib/prisma$': '<rootDir>/tests/__mocks__/prisma.js',
+    '^../lib/shopifyClient$': '<rootDir>/tests/__mocks__/shopifyClient.js',
+    '^./lib/shopifyClient$': '<rootDir>/tests/__mocks__/shopifyClient.js',
   },
 };

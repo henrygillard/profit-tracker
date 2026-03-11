@@ -49,6 +49,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', require('./routes/auth'));
 app.use('/webhooks', require('./routes/webhooks'));
 
+// JWT-protected API routes — shop identity from token, not query string
+const { verifySessionToken } = require('./lib/verifySessionToken');
+app.use('/api', verifySessionToken);
+app.use('/api', require('./routes/api'));
+
 /**
  * GET /health — Liveness probe for Railway / uptime monitors
  */

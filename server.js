@@ -13,6 +13,8 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const { prisma } = require('./lib/prisma');
 const { validateShop } = require('./lib/utils');
+const { startScheduler } = require('./lib/scheduler');
+const { syncIncrementalOrders } = require('./lib/syncOrders');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -129,6 +131,10 @@ app.use((err, req, res, _next) => {
   console.error({ message: err.message, stack: err.stack, shop: req.query.shop });
   res.status(500).send('Internal server error');
 });
+
+// Start 15-minute polling backstop for missed webhooks (SYNC-03)
+// Must be called after all routes are mounted so it runs in production
+startScheduler(prisma, syncIncrementalOrders);
 
 // Start server with graceful shutdown
 const server = app.listen(PORT, () => {

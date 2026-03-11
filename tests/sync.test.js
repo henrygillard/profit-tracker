@@ -150,9 +150,56 @@ describe('refunds/create webhook (SYNC-02)', () => {
   });
 });
 
+// node-cron mock — captures callback so tests can invoke it synchronously
+jest.mock('node-cron', () => {
+  const mod = {
+    schedule: jest.fn((pattern, callback, options) => {
+      mod._capturedCallback = callback;
+    }),
+    _capturedCallback: null,
+  };
+  return mod;
+});
+
 describe('scheduler (SYNC-03)', () => {
-  test('startScheduler registers a cron job that calls syncFn for each shop', () => {
-    // RED: lib/scheduler.js not yet created
-    expect(false).toBe(true, 'implement startScheduler in lib/scheduler.js');
+  test('startScheduler registers a cron job that calls syncFn for each shop', async () => {
+    const cron = require('node-cron');
+    const { startScheduler } = require('../lib/scheduler');
+    const { prisma } = require('../lib/prisma');
+
+    prisma.shopSession = {
+      findMany: jest.fn().mockResolvedValue([
+        { shop: 'store1.myshopify.com', accessToken: 'tok1' },
+        { shop: 'store2.myshopify.com', accessToken: 'tok2' },
+      ]),
+    };
+    const syncFn = jest.fn().mockResolvedValue(undefined);
+
+    startScheduler(prisma, syncFn);
+
+    // Manually trigger the captured cron callback
+    await cron._capturedCallback();
+
+    expect(syncFn).toHaveBeenCalledTimes(2);
+    expect(syncFn).toHaveBeenCalledWith('store1.myshopify.com', 'tok1');
+    expect(syncFn).toHaveBeenCalledWith('store2.myshopify.com', 'tok2');
+  });
+
+  test('startScheduler catches syncFn errors without bubbling', async () => {
+    const cron = require('node-cron');
+    const { startScheduler } = require('../lib/scheduler');
+    const { prisma } = require('../lib/prisma');
+
+    prisma.shopSession = {
+      findMany: jest.fn().mockResolvedValue([
+        { shop: 'bad-shop.myshopify.com', accessToken: 'tok-bad' },
+      ]),
+    };
+    const syncFn = jest.fn().mockRejectedValue(new Error('sync failure'));
+
+    startScheduler(prisma, syncFn);
+
+    // Should not throw even though syncFn throws
+    await expect(cron._capturedCallback()).resolves.not.toThrow();
   });
 });

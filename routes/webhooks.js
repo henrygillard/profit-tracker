@@ -3,6 +3,13 @@ const router = express.Router();
 const crypto = require('crypto');
 const { prisma } = require('../lib/prisma');
 const { timingSafeEqual } = require('../lib/utils');
+const { upsertOrder, parseOrderFromShopify } = require('../lib/syncOrders');
+const { calculateOrderProfit } = require('../lib/profitEngine');
+
+// In-memory deduplication for Shopify webhook retries (MVP: covers 15-min retry window)
+const processedWebhooks = new Set();
+// Clean up every 30 minutes to prevent unbounded growth
+setInterval(() => processedWebhooks.clear(), 30 * 60 * 1000);
 
 // IMPORTANT: This route requires raw body (set in server.js middleware order).
 // Do not move or reorder the raw body middleware — HMAC verification will silently break.
@@ -108,6 +115,149 @@ router.post('/customers/data_request', async (req, res) => {
     console.error('customers/data_request error:', err);
     res.status(500).send('Error');
   }
+});
+
+/**
+ * POST /webhooks/orders/paid — Real-time order ingestion (SYNC-02)
+ * Responds 200 immediately; processes order asynchronously to stay within Shopify's 5s timeout.
+ */
+router.post('/orders/paid', async (req, res) => {
+  const hmac = req.headers['x-shopify-hmac-sha256'];
+  if (!verifyWebhookHmac(req.body, hmac)) return res.status(401).send('Unauthorized');
+
+  const webhookId = req.headers['x-shopify-webhook-id'];
+  if (webhookId && processedWebhooks.has(webhookId)) return res.status(200).send('OK');
+  if (webhookId) processedWebhooks.add(webhookId);
+
+  res.status(200).send('OK'); // Respond before async work
+
+  setImmediate(async () => {
+    try {
+      const rawOrder = JSON.parse(req.body.toString());
+      const shop = rawOrder.myshopify_domain || new URL(rawOrder.order_status_url || 'https://unknown').hostname;
+      const session = await prisma.shopSession.findFirst({ where: { shop } });
+      const config = await prisma.shopConfig.findFirst({ where: { shop } });
+      if (!session) return;
+      const parsed = parseOrderFromShopify(rawOrder);
+      await upsertOrder(prisma, shop, parsed, 0, config?.shopifyPlan || null);
+    } catch (err) {
+      console.error('orders/paid processing error:', err.message);
+    }
+  });
+});
+
+/**
+ * POST /webhooks/orders/updated — Order update sync (SYNC-02)
+ * Same processing path as orders/paid — full order object from Shopify.
+ */
+router.post('/orders/updated', async (req, res) => {
+  const hmac = req.headers['x-shopify-hmac-sha256'];
+  if (!verifyWebhookHmac(req.body, hmac)) return res.status(401).send('Unauthorized');
+
+  const webhookId = req.headers['x-shopify-webhook-id'];
+  if (webhookId && processedWebhooks.has(webhookId)) return res.status(200).send('OK');
+  if (webhookId) processedWebhooks.add(webhookId);
+
+  res.status(200).send('OK');
+
+  setImmediate(async () => {
+    try {
+      const rawOrder = JSON.parse(req.body.toString());
+      const shop = rawOrder.myshopify_domain;
+      if (!shop) return;
+      const session = await prisma.shopSession.findFirst({ where: { shop } });
+      const config = await prisma.shopConfig.findFirst({ where: { shop } });
+      if (!session) return;
+      const parsed = parseOrderFromShopify(rawOrder);
+      await upsertOrder(prisma, shop, parsed, 0, config?.shopifyPlan || null);
+    } catch (err) {
+      console.error('orders/updated processing error:', err.message);
+    }
+  });
+});
+
+/**
+ * POST /webhooks/orders/cancelled — Order cancellation sync (SYNC-02)
+ * Same path as updated — upsertOrder stores 'CANCELLED' as financialStatus.
+ */
+router.post('/orders/cancelled', async (req, res) => {
+  const hmac = req.headers['x-shopify-hmac-sha256'];
+  if (!verifyWebhookHmac(req.body, hmac)) return res.status(401).send('Unauthorized');
+
+  const webhookId = req.headers['x-shopify-webhook-id'];
+  if (webhookId && processedWebhooks.has(webhookId)) return res.status(200).send('OK');
+  if (webhookId) processedWebhooks.add(webhookId);
+
+  res.status(200).send('OK');
+
+  setImmediate(async () => {
+    try {
+      const rawOrder = JSON.parse(req.body.toString());
+      const shop = rawOrder.myshopify_domain;
+      if (!shop) return;
+      const session = await prisma.shopSession.findFirst({ where: { shop } });
+      const config = await prisma.shopConfig.findFirst({ where: { shop } });
+      if (!session) return;
+      const parsed = parseOrderFromShopify(rawOrder);
+      await upsertOrder(prisma, shop, parsed, 0, config?.shopifyPlan || null);
+    } catch (err) {
+      console.error('orders/cancelled processing error:', err.message);
+    }
+  });
+});
+
+/**
+ * POST /webhooks/refunds/create — Profit reversal on refund (FEES-04)
+ * Recalculates OrderProfit for the parent order with updated refund amounts.
+ */
+router.post('/refunds/create', async (req, res) => {
+  const hmac = req.headers['x-shopify-hmac-sha256'];
+  if (!verifyWebhookHmac(req.body, hmac)) return res.status(401).send('Unauthorized');
+
+  const webhookId = req.headers['x-shopify-webhook-id'];
+  if (webhookId && processedWebhooks.has(webhookId)) return res.status(200).send('OK');
+  if (webhookId) processedWebhooks.add(webhookId);
+
+  res.status(200).send('OK');
+
+  setImmediate(async () => {
+    try {
+      const payload = JSON.parse(req.body.toString());
+      const shop = payload.order_id
+        ? await (async () => {
+            const order = await prisma.order.findUnique({ where: { id: `gid://shopify/Order/${payload.order_id}` } });
+            return order?.shop || null;
+          })()
+        : null;
+      if (!shop) return;
+
+      // Re-fetch the full order from DB and recalculate profit
+      const order = await prisma.order.findUnique({
+        where: { id: `gid://shopify/Order/${payload.order_id}` },
+        include: { lineItems: true, profit: true },
+      });
+      if (!order) return;
+
+      const config = await prisma.shopConfig.findFirst({ where: { shop } });
+      const updatedTotalRefunded = parseFloat(payload.transactions?.reduce((s, t) => s + parseFloat(t.amount || 0), 0) || 0);
+      const updatedCurrentTotal = parseFloat(order.totalPrice) - updatedTotalRefunded;
+
+      const parsedForRecalc = {
+        ...order,
+        currentTotalPrice: updatedCurrentTotal,
+        totalRefunded: updatedTotalRefunded,
+        lineItems: order.lineItems.map(li => ({
+          ...li,
+          cogs: null, // Will be re-looked up by upsertOrder via profitEngine
+        })),
+      };
+
+      const existingFee = order.profit ? parseFloat(order.profit.feesTotal) : 0;
+      await upsertOrder(prisma, shop, parsedForRecalc, existingFee, config?.shopifyPlan || null);
+    } catch (err) {
+      console.error('refunds/create processing error:', err.message);
+    }
+  });
 });
 
 module.exports = router;

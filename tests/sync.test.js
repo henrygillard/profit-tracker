@@ -1,6 +1,13 @@
 // tests/sync.test.js
 // Test scaffolds for SYNC-01 (bulk operations), SYNC-02 (webhooks), SYNC-03 (polling).
 
+const crypto = require('crypto');
+const express = require('express');
+const request = require('supertest');
+
+// Set test secret before requiring webhook router
+process.env.SHOPIFY_API_SECRET = 'test-secret';
+
 // Mock profitEngine before any requires
 jest.mock('../lib/profitEngine', () => ({
   calculateOrderProfit: jest.fn().mockReturnValue({
@@ -14,9 +21,50 @@ jest.mock('../lib/profitEngine', () => ({
   getCOGSAtTime: jest.fn().mockResolvedValue(null),
 }), { virtual: true });
 
+// Mock syncOrders functions to avoid DB calls in webhook route tests
+jest.mock('../lib/syncOrders', () => ({
+  upsertOrder: jest.fn().mockResolvedValue({ orderId: 'gid://shopify/Order/1' }),
+  parseOrderFromShopify: jest.fn().mockReturnValue({
+    id: 'gid://shopify/Order/1',
+    shopifyOrderName: '#1001',
+    processedAt: new Date('2024-01-15T00:00:00Z'),
+    financialStatus: 'PAID',
+    totalPrice: 100,
+    currentTotalPrice: 100,
+    totalRefunded: 0,
+    shippingCost: 0,
+    paymentGateway: 'shopify_payments',
+    lineItems: [],
+  }),
+  processBulkResult: jest.fn().mockResolvedValue(0),
+  triggerBulkSync: jest.fn().mockResolvedValue(undefined),
+  syncIncrementalOrders: jest.fn().mockResolvedValue(undefined),
+}));
+
+/**
+ * Build a minimal Express app that mirrors server.js middleware order for webhook tests.
+ */
+function buildWebhookTestApp() {
+  const app = express();
+  app.use(express.raw({ type: 'application/json' }));
+  const webhookRouter = require('../routes/webhooks');
+  app.use('/webhooks', webhookRouter);
+  return app;
+}
+
+/**
+ * Generate a valid Shopify HMAC signature for the given body string.
+ */
+function computeHmac(body) {
+  return crypto
+    .createHmac('sha256', 'test-secret')
+    .update(Buffer.isBuffer(body) ? body : Buffer.from(body))
+    .digest('base64');
+}
+
 describe('bulk operation trigger (SYNC-01)', () => {
   test('triggerBulkSync sends bulkOperationRunQuery mutation', async () => {
-    const { triggerBulkSync } = require('../lib/syncOrders');
+    const { triggerBulkSync } = jest.requireActual('../lib/syncOrders');
     const { shopifyGraphQL } = require('../lib/shopifyClient');
     const { prisma } = require('../lib/prisma');
 
@@ -49,7 +97,7 @@ describe('bulk operation trigger (SYNC-01)', () => {
 
 describe('JSONL parser (SYNC-01)', () => {
   test('parseJsonlLine handles order root node', () => {
-    const { parseOrderFromShopify } = require('../lib/syncOrders');
+    const { parseOrderFromShopify } = jest.requireActual('../lib/syncOrders');
 
     const raw = {
       id: 'gid://shopify/Order/1',
@@ -76,7 +124,7 @@ describe('JSONL parser (SYNC-01)', () => {
 
 describe('order upsert creates profit record (SYNC-01)', () => {
   test('upsertOrder writes Order and OrderProfit atomically', async () => {
-    const { upsertOrder } = require('../lib/syncOrders');
+    const { upsertOrder } = jest.requireActual('../lib/syncOrders');
     const { prisma } = require('../lib/prisma');
 
     // Set up prisma mock with transaction and required models
@@ -133,20 +181,118 @@ describe('order upsert creates profit record (SYNC-01)', () => {
 });
 
 describe('orders/paid webhook (SYNC-02)', () => {
-  test('POST /webhooks/orders/paid with valid HMAC upserts order and returns 200', async () => {
-    // RED: webhook handler not yet added to routes/webhooks.js
-    expect(false).toBe(true, 'add orders/paid handler to routes/webhooks.js');
+  const orderBody = JSON.stringify({
+    id: 1001,
+    name: '#1001',
+    myshopify_domain: 'test.myshopify.com',
+    processedAt: '2024-01-15T00:00:00Z',
+    displayFinancialStatus: 'PAID',
+    totalPriceSet: { shopMoney: { amount: '100.00', currencyCode: 'USD' } },
+    currentTotalPriceSet: { shopMoney: { amount: '100.00' } },
+    totalRefundedSet: { shopMoney: { amount: '0.00' } },
+    shippingLines: [],
+    paymentGatewayNames: ['shopify_payments'],
+    lineItems: { nodes: [] },
   });
+
+  test('POST /webhooks/orders/paid with valid HMAC responds 200 immediately', async () => {
+    const { prisma } = require('../lib/prisma');
+    prisma.shopSession = { findFirst: jest.fn().mockResolvedValue({ shop: 'test.myshopify.com', accessToken: 'tok' }) };
+    prisma.shopConfig = { findFirst: jest.fn().mockResolvedValue(null) };
+
+    const hmac = computeHmac(orderBody);
+    const app = buildWebhookTestApp();
+    const res = await request(app)
+      .post('/webhooks/orders/paid')
+      .set('Content-Type', 'application/json')
+      .set('X-Shopify-Hmac-Sha256', hmac)
+      .set('X-Shopify-Webhook-Id', 'wh-id-001')
+      .send(orderBody);
+
+    expect(res.status).toBe(200);
+  });
+
   test('POST /webhooks/orders/paid with invalid HMAC returns 401', async () => {
-    // RED: webhook handler not yet added
-    expect(false).toBe(true, 'add orders/paid handler to routes/webhooks.js');
+    const app = buildWebhookTestApp();
+    const res = await request(app)
+      .post('/webhooks/orders/paid')
+      .set('Content-Type', 'application/json')
+      .set('X-Shopify-Hmac-Sha256', 'invalid-hmac')
+      .send(orderBody);
+
+    expect(res.status).toBe(401);
+  });
+
+  test('POST /webhooks/orders/paid deduplicates on X-Shopify-Webhook-Id', async () => {
+    const { prisma } = require('../lib/prisma');
+    prisma.shopSession = { findFirst: jest.fn().mockResolvedValue({ shop: 'test.myshopify.com', accessToken: 'tok' }) };
+    prisma.shopConfig = { findFirst: jest.fn().mockResolvedValue(null) };
+
+    const hmac = computeHmac(orderBody);
+    const app = buildWebhookTestApp();
+
+    // First request
+    const res1 = await request(app)
+      .post('/webhooks/orders/paid')
+      .set('Content-Type', 'application/json')
+      .set('X-Shopify-Hmac-Sha256', hmac)
+      .set('X-Shopify-Webhook-Id', 'wh-dedup-001')
+      .send(orderBody);
+
+    // Second request with same webhook ID
+    const res2 = await request(app)
+      .post('/webhooks/orders/paid')
+      .set('Content-Type', 'application/json')
+      .set('X-Shopify-Hmac-Sha256', hmac)
+      .set('X-Shopify-Webhook-Id', 'wh-dedup-001')
+      .send(orderBody);
+
+    expect(res1.status).toBe(200);
+    expect(res2.status).toBe(200);
   });
 });
 
 describe('refunds/create webhook (SYNC-02)', () => {
-  test('POST /webhooks/refunds/create recalculates profit and returns 200', async () => {
-    // RED: webhook handler not yet added
-    expect(false).toBe(true, 'add refunds/create handler to routes/webhooks.js');
+  const refundBody = JSON.stringify({
+    id: 5001,
+    order_id: 1001,
+    transactions: [{ amount: '10.00' }],
+  });
+
+  test('POST /webhooks/refunds/create with valid HMAC returns 200', async () => {
+    const { prisma } = require('../lib/prisma');
+    prisma.order = {
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'gid://shopify/Order/1001',
+        shop: 'test.myshopify.com',
+        totalPrice: '100.00',
+        lineItems: [],
+        profit: { feesTotal: '3.00' },
+      }),
+    };
+    prisma.shopConfig = { findFirst: jest.fn().mockResolvedValue(null) };
+
+    const hmac = computeHmac(refundBody);
+    const app = buildWebhookTestApp();
+    const res = await request(app)
+      .post('/webhooks/refunds/create')
+      .set('Content-Type', 'application/json')
+      .set('X-Shopify-Hmac-Sha256', hmac)
+      .set('X-Shopify-Webhook-Id', 'wh-refund-001')
+      .send(refundBody);
+
+    expect(res.status).toBe(200);
+  });
+
+  test('POST /webhooks/refunds/create with invalid HMAC returns 401', async () => {
+    const app = buildWebhookTestApp();
+    const res = await request(app)
+      .post('/webhooks/refunds/create')
+      .set('Content-Type', 'application/json')
+      .set('X-Shopify-Hmac-Sha256', 'bad-hmac')
+      .send(refundBody);
+
+    expect(res.status).toBe(401);
   });
 });
 

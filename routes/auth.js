@@ -3,6 +3,53 @@ const router = express.Router();
 const crypto = require('crypto');
 const path = require('path');
 const { prisma } = require('../lib/prisma');
+const { validateShop, timingSafeEqual } = require('../lib/utils');
+const { shopifyGraphQL } = require('../lib/shopifyClient');
+
+const WEBHOOK_TOPICS = [
+  { topic: 'ORDERS_PAID',            uri: '/webhooks/orders/paid' },
+  { topic: 'ORDERS_UPDATED',         uri: '/webhooks/orders/updated' },
+  { topic: 'ORDERS_CANCELLED',       uri: '/webhooks/orders/cancelled' },
+  { topic: 'REFUNDS_CREATE',         uri: '/webhooks/refunds/create' },
+  { topic: 'BULK_OPERATIONS_FINISH', uri: '/webhooks/bulk/finish' },
+];
+
+const WEBHOOK_CREATE_MUTATION = `
+  mutation webhookSubscriptionCreate($topic: WebhookSubscriptionTopic!, $uri: URL!) {
+    webhookSubscriptionCreate(
+      topic: $topic
+      webhookSubscription: { format: JSON, uri: $uri }
+    ) {
+      userErrors { field message }
+      webhookSubscription { id }
+    }
+  }
+`;
+
+async function registerWebhooks(shop, accessToken) {
+  const appUrl = process.env.SHOPIFY_APP_URL;
+  if (!appUrl) {
+    console.error('registerWebhooks: SHOPIFY_APP_URL env var not set — skipping webhook registration');
+    return;
+  }
+  for (const { topic, uri } of WEBHOOK_TOPICS) {
+    try {
+      const data = await shopifyGraphQL(shop, accessToken, WEBHOOK_CREATE_MUTATION, {
+        topic,
+        uri: appUrl + uri,
+      });
+      const result = data?.webhookSubscriptionCreate;
+      if (result?.userErrors?.length) {
+        console.error(`registerWebhooks: ${topic} error:`, result.userErrors[0].message);
+      } else {
+        console.log(`registerWebhooks: ${topic} registered (id: ${result?.webhookSubscription?.id})`);
+      }
+    } catch (err) {
+      // Non-fatal: log but do not abort OAuth flow
+      console.error(`registerWebhooks: failed to register ${topic}:`, err.message);
+    }
+  }
+}
 
 // Legal pages
 router.get('/privacy', (_req, res) =>
@@ -20,6 +67,10 @@ router.get('/auth', async (req, res) => {
   if (!shop) return res.status(400).send('Missing shop parameter');
 
   const normalizedShop = shop.includes('.') ? shop : `${shop}.myshopify.com`;
+
+  if (!validateShop(normalizedShop)) {
+    return res.status(400).send('Invalid shop domain');
+  }
 
   // Break out of Shopify iframe for top-level OAuth redirect
   if (req.query.embedded === '1' || req.query.host) {
@@ -77,6 +128,10 @@ router.get('/auth/callback', async (req, res) => {
       return res.status(400).send('Missing required parameters');
     }
 
+    if (!validateShop(shop)) {
+      return res.status(400).send('Invalid shop domain');
+    }
+
     // Verify state
     const storedState = await prisma.oAuthState.findUnique({ where: { state } });
     if (!storedState || storedState.shop !== shop) {
@@ -84,7 +139,7 @@ router.get('/auth/callback', async (req, res) => {
     }
     await prisma.oAuthState.delete({ where: { state } });
 
-    // Verify HMAC
+    // Verify HMAC using timing-safe comparison
     const queryParams = { ...req.query };
     delete queryParams.hmac;
     const message = Object.keys(queryParams)
@@ -96,11 +151,13 @@ router.get('/auth/callback', async (req, res) => {
       .update(message)
       .digest('hex');
 
-    if (generatedHmac !== hmac) {
+    if (!timingSafeEqual(generatedHmac, hmac)) {
       return res.status(400).send('HMAC verification failed');
     }
 
-    // Exchange code for access token
+    // Exchange code for access token (with timeout)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
     const tokenRes = await fetch(`https://${shop}/admin/oauth/access_token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -109,7 +166,8 @@ router.get('/auth/callback', async (req, res) => {
         client_secret: process.env.SHOPIFY_API_SECRET,
         code,
       }),
-    });
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeout));
 
     if (!tokenRes.ok) {
       return res.status(500).send('Failed to get access token');
@@ -131,6 +189,11 @@ router.get('/auth/callback', async (req, res) => {
     });
 
     console.log(`OAuth completed for ${shop}`);
+
+    // Fire-and-forget — errors are logged inside registerWebhooks, not fatal to auth flow
+    registerWebhooks(shop, access_token).catch(err =>
+      console.error('registerWebhooks unexpected error:', err.message)
+    );
 
     // Redirect to admin UI
     if (req.query.host) {

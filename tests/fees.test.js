@@ -38,9 +38,65 @@ describe('Shopify Payments processor fee (FEES-02)', () => {
 });
 
 describe('shipping cost (FEES-03)', () => {
-  test('upsertOrder stores shippingLines.originalPriceSet.shopMoney.amount as shippingCost', () => {
-    // RED: lib/syncOrders.js not yet created
-    expect(false).toBe(true, 'implement shipping extraction in lib/syncOrders.js');
+  const { parseOrderFromShopify } = require('../lib/syncOrders');
+
+  test('parseOrderFromShopify sums shippingLines.originalPriceSet.shopMoney.amount as shippingCost', () => {
+    const rawOrder = {
+      id: 'gid://shopify/Order/1',
+      name: '#1001',
+      processedAt: '2025-01-15T00:00:00Z',
+      displayFinancialStatus: 'PAID',
+      totalPriceSet: { shopMoney: { amount: '109.99', currencyCode: 'USD' } },
+      currentTotalPriceSet: { shopMoney: { amount: '109.99' } },
+      totalRefundedSet: { shopMoney: { amount: '0' } },
+      shippingLines: [
+        { originalPriceSet: { shopMoney: { amount: '9.99' } } },
+      ],
+      paymentGatewayNames: ['manual'],
+      lineItems: { nodes: [] },
+    };
+
+    const result = parseOrderFromShopify(rawOrder);
+    expect(result.shippingCost).toBe(9.99);
+  });
+
+  test('parseOrderFromShopify sums multiple shippingLines correctly', () => {
+    const rawOrder = {
+      id: 'gid://shopify/Order/2',
+      name: '#1002',
+      processedAt: '2025-01-15T00:00:00Z',
+      displayFinancialStatus: 'PAID',
+      totalPriceSet: { shopMoney: { amount: '120.00', currencyCode: 'USD' } },
+      currentTotalPriceSet: { shopMoney: { amount: '120.00' } },
+      totalRefundedSet: { shopMoney: { amount: '0' } },
+      shippingLines: [
+        { originalPriceSet: { shopMoney: { amount: '5.00' } } },
+        { originalPriceSet: { shopMoney: { amount: '4.99' } } },
+      ],
+      paymentGatewayNames: ['manual'],
+      lineItems: { nodes: [] },
+    };
+
+    const result = parseOrderFromShopify(rawOrder);
+    expect(result.shippingCost).toBeCloseTo(9.99, 5);
+  });
+
+  test('parseOrderFromShopify returns shippingCost of 0 when shippingLines is empty', () => {
+    const rawOrder = {
+      id: 'gid://shopify/Order/3',
+      name: '#1003',
+      processedAt: '2025-01-15T00:00:00Z',
+      displayFinancialStatus: 'PAID',
+      totalPriceSet: { shopMoney: { amount: '50.00', currencyCode: 'USD' } },
+      currentTotalPriceSet: { shopMoney: { amount: '50.00' } },
+      totalRefundedSet: { shopMoney: { amount: '0' } },
+      shippingLines: [],
+      paymentGatewayNames: ['manual'],
+      lineItems: { nodes: [] },
+    };
+
+    const result = parseOrderFromShopify(rawOrder);
+    expect(result.shippingCost).toBe(0);
   });
 });
 

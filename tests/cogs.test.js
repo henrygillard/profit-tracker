@@ -95,10 +95,28 @@ describe('manual COGS entry (COGS-01)', () => {
 });
 
 describe('auto-populate from Shopify unitCost (COGS-02)', () => {
-  test('extractCOGS returns inventoryItem.unitCost.amount when present', () => {
-    // RED: lib/syncOrders.js extractCOGS not yet tested in this file (covered in sync.test.js)
-    // This test remains as a placeholder for COGS-02 traceability
-    expect(true).toBe(true);
+  const { extractCOGS } = require('../lib/syncOrders');
+
+  test('extractCOGS returns inventoryItem.unitCost.amount as a float when present', () => {
+    const lineItem = {
+      variant: {
+        id: 'gid://shopify/ProductVariant/1',
+        sku: 'SHIRT-M',
+        inventoryItem: { unitCost: { amount: '12.50' } },
+      },
+    };
+    expect(extractCOGS(lineItem)).toBe(12.50);
+  });
+
+  test('extractCOGS returns null when inventoryItem.unitCost is absent', () => {
+    const lineItemNoVariant = {};
+    expect(extractCOGS(lineItemNoVariant)).toBeNull();
+
+    const lineItemNoCost = { variant: { inventoryItem: {} } };
+    expect(extractCOGS(lineItemNoCost)).toBeNull();
+
+    const lineItemNoInventory = { variant: {} };
+    expect(extractCOGS(lineItemNoInventory)).toBeNull();
   });
 });
 

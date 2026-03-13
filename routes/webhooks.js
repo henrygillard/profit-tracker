@@ -260,4 +260,65 @@ router.post('/refunds/create', async (req, res) => {
   });
 });
 
+/**
+ * POST /webhooks/bulk/finish — Bulk operation complete (SYNC-01)
+ * Downloads and processes the JSONL result of the historical order sync.
+ */
+router.post('/bulk/finish', async (req, res) => {
+  const hmac = req.headers['x-shopify-hmac-sha256'];
+  if (!verifyWebhookHmac(req.body, hmac)) return res.status(401).send('Unauthorized');
+
+  res.status(200).send('OK'); // Respond immediately — JSONL processing can take minutes
+
+  setImmediate(async () => {
+    try {
+      const payload = JSON.parse(req.body.toString());
+      const bulkOpGid = payload.admin_graphql_api_id;
+      if (!bulkOpGid) return;
+
+      // Find which shop triggered this bulk op
+      const config = await prisma.shopConfig.findFirst({ where: { bulkOpId: bulkOpGid } });
+      if (!config) {
+        console.log(`bulk/finish: no config found for bulkOpId ${bulkOpGid} — skipping`);
+        return;
+      }
+
+      const session = await prisma.shopSession.findFirst({ where: { shop: config.shop } });
+      if (!session) return;
+
+      // Get the JSONL download URL from Shopify
+      const { shopifyGraphQL } = require('../lib/shopifyClient');
+      const BULK_OP_STATUS_QUERY = `
+        query($id: ID!) {
+          node(id: $id) {
+            ... on BulkOperation {
+              id status url errorCode objectCount
+            }
+          }
+        }
+      `;
+      const data = await shopifyGraphQL(config.shop, session.accessToken, BULK_OP_STATUS_QUERY, { id: bulkOpGid });
+      const bulkOp = data?.node;
+
+      if (bulkOp?.status !== 'COMPLETED') {
+        console.error(`bulk/finish: operation ${bulkOpGid} status=${bulkOp?.status} errorCode=${bulkOp?.errorCode}`);
+        return;
+      }
+
+      if (!bulkOp.url) {
+        console.log(`bulk/finish: no data URL for ${bulkOpGid} (store may have 0 orders)`);
+        await prisma.shopConfig.update({ where: { shop: config.shop }, data: { bulkOpId: null } });
+        return;
+      }
+
+      console.log(`bulk/finish: processing ${bulkOp.objectCount} objects for ${config.shop}`);
+      const { processBulkResult } = require('../lib/syncOrders');
+      await processBulkResult(prisma, config.shop, session.accessToken, bulkOp.url);
+      console.log(`bulk/finish: completed for ${config.shop}`);
+    } catch (err) {
+      console.error('bulk/finish processing error:', err.message);
+    }
+  });
+});
+
 module.exports = router;

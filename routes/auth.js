@@ -197,20 +197,13 @@ router.get('/auth/callback', async (req, res) => {
       console.error('registerWebhooks unexpected error:', err.message)
     );
 
-    // Create billing subscription and redirect merchant to Shopify approval page
+    // Create billing subscription and redirect merchant to Shopify approval page.
+    // OAuth callback is top-level (not embedded), so use a plain redirect — App Bridge
+    // is not available here and host param is never present in callback URLs.
     try {
       const billing = await createBillingSubscription(shop, access_token);
       if (billing.confirmationUrl) {
-        const host = req.query.host || '';
-        const apiKey = process.env.SHOPIFY_API_KEY;
-        const url = billing.confirmationUrl;
-        return res.send(`<!DOCTYPE html><html><head>
-          <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
-          <script>
-            var app = ShopifyAppBridge.createApp({ apiKey: ${JSON.stringify(apiKey)}, host: ${JSON.stringify(host)} });
-            ShopifyAppBridge.actions.Redirect.create(app).dispatch(ShopifyAppBridge.actions.Redirect.Action.REMOTE, ${JSON.stringify(url)});
-          </script>
-        </head><body>Redirecting to billing...</body></html>`);
+        return res.redirect(billing.confirmationUrl);
       }
     } catch (err) {
       console.error('createBillingSubscription error:', err.message);

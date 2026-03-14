@@ -89,7 +89,19 @@
       "Bash(node \"$HOME/.claude/get-shit-done/bin/gsd-tools.cjs\" state record-session --stopped-at \"Completed 04-billing 04-03-PLAN.md\" 2>&1)",
       "Bash(railway variables:*)",
       "Bash(railway whoami:*)",
-      "Bash(railway up:*)"
+      "Bash(railway up:*)",
+      "Bash(railway run:*)",
+      "Bash(railway link:*)",
+      "Bash(railway list:*)",
+      "Bash(for proj:*)",
+      "Read(//Users/henry/.railway/**)",
+      "Bash(railway ps:*)",
+      "Bash(railway --help 2>&1)",
+      "Bash(railway service:*)",
+      "Bash(railway environment:*)",
+      "Bash(railway status:*)",
+      "Bash(railway connect:*)",
+      "Bash(railway logs:*)"
     ]
   }
 }

@@ -17,7 +17,7 @@ const WEBHOOK_TOPICS = [
 ];
 
 const WEBHOOK_CREATE_MUTATION = `
-  mutation webhookSubscriptionCreate($topic: WebhookSubscriptionTopic!, $uri: URL!) {
+  mutation webhookSubscriptionCreate($topic: WebhookSubscriptionTopic!, $uri: String!) {
     webhookSubscriptionCreate(
       topic: $topic
       webhookSubscription: { format: JSON, uri: $uri }

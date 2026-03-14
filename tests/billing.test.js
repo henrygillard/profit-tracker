@@ -30,6 +30,7 @@ process.env.SHOPIFY_APP_URL = process.env.SHOPIFY_APP_URL || 'https://test.examp
 // TODO: remove this comment when routes/billing.js exists
 const {
   createBillingSubscription,
+  checkBillingStatus,
   billingWebhookRouter,
 } = require('../routes/billing');
 
@@ -102,8 +103,17 @@ function makeApp() {
       return res.redirect(`/auth?shop=${encodeURIComponent(shop)}`);
     }
 
-    // Billing gate: if not ACTIVE, create subscription and redirect
+    // Billing gate with Pattern 5 live verification fallback
     if (session.billingStatus !== 'ACTIVE') {
+      // Race condition: merchant just approved but webhook not yet fired
+      const isActive = await checkBillingStatus(shop, session.accessToken);
+      if (isActive) {
+        await prisma.shopSession.update({
+          where: { shop },
+          data: { billingStatus: 'ACTIVE' },
+        });
+        return res.status(200).sendFile(path.join(__dirname, '..', 'public', 'app', 'index.html'));
+      }
       const { confirmationUrl } = await createBillingSubscription(shop, session.accessToken);
       return res.redirect(confirmationUrl);
     }
@@ -245,7 +255,10 @@ describe('BILL-01 Test 5: /admin — live Shopify ACTIVE overrides null billingS
       billingStatus: 'ACTIVE',
     });
 
-    // Mock Shopify GraphQL to return ACTIVE subscription
+    // Mock checkBillingStatus to return true (live Shopify confirms ACTIVE)
+    checkBillingStatus.mockResolvedValue(true);
+
+    // Mock Shopify GraphQL to return ACTIVE subscription (used by real checkBillingStatus)
     shopifyGraphQL.mockResolvedValue({
       currentAppInstallation: {
         activeSubscriptions: [
@@ -258,10 +271,7 @@ describe('BILL-01 Test 5: /admin — live Shopify ACTIVE overrides null billingS
     });
 
     // createBillingSubscription should NOT be called in this path
-    // Instead, the billing check should query Shopify live and update DB
-    // Plan 04-02 implements this logic in /admin route
-    // For Wave 0: assert the expected DB update was made
-    // This test will fail RED because routes/billing.js is MISSING
+    // Instead, checkBillingStatus queries Shopify live → returns true → update DB + serve index.html
 
     const res = await request(app)
       .get('/admin?shop=test-shop.myshopify.com');

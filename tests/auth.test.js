@@ -26,6 +26,9 @@ try {
   moduleLoaded = false;
 }
 
+// Import mocked prisma so we can control findFirst return values per test
+const { prisma } = require('../lib/prisma');
+
 /**
  * Build a minimal express app with the JWT middleware applied to /api/* routes.
  * Returns null if the module isn't loaded yet.
@@ -64,6 +67,16 @@ describe('JWT session-token middleware (FOUND-04)', () => {
 
   beforeAll(() => {
     app = buildApp();
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Default: return an ACTIVE session so valid-JWT tests reach the route handler
+    prisma.shopSession.findFirst.mockResolvedValue({
+      shop: 'test.myshopify.com',
+      accessToken: 'test-token',
+      billingStatus: 'ACTIVE',
+    });
   });
 
   it('GET /api/health without Authorization header returns 401', async () => {

@@ -15,6 +15,7 @@ const { prisma } = require('./lib/prisma');
 const { validateShop } = require('./lib/utils');
 const { startScheduler } = require('./lib/scheduler');
 const { syncIncrementalOrders } = require('./lib/syncOrders');
+const { createBillingSubscription, checkBillingStatus } = require('./routes/billing');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -72,6 +73,20 @@ app.get('/admin', async (req, res) => {
   const session = await prisma.shopSession.findFirst({ where: { shop } });
   if (!session) {
     return res.redirect(`/auth?shop=${encodeURIComponent(shop)}`);
+  }
+
+  // Billing gate with Pattern 5 live verification fallback
+  if (session.billingStatus !== 'ACTIVE') {
+    // Race condition: merchant just approved but webhook not yet fired
+    const isActive = await checkBillingStatus(shop, session.accessToken);
+    if (isActive) {
+      await prisma.shopSession.update({ where: { shop }, data: { billingStatus: 'ACTIVE' } });
+      return res.sendFile(path.join(__dirname, 'public', 'app', 'index.html'));
+    }
+    const billing = await createBillingSubscription(shop, session.accessToken);
+    if (billing.confirmationUrl) return res.redirect(billing.confirmationUrl);
+    // Billing error fallthrough — serve app (don't block merchant indefinitely)
+    return res.sendFile(path.join(__dirname, 'public', 'app', 'index.html'));
   }
 
   res.sendFile(path.join(__dirname, 'public', 'app', 'index.html'));

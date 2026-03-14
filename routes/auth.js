@@ -5,13 +5,15 @@ const path = require('path');
 const { prisma } = require('../lib/prisma');
 const { validateShop, timingSafeEqual } = require('../lib/utils');
 const { shopifyGraphQL } = require('../lib/shopifyClient');
+const { createBillingSubscription } = require('./billing');
 
 const WEBHOOK_TOPICS = [
-  { topic: 'ORDERS_PAID',            uri: '/webhooks/orders/paid' },
-  { topic: 'ORDERS_UPDATED',         uri: '/webhooks/orders/updated' },
-  { topic: 'ORDERS_CANCELLED',       uri: '/webhooks/orders/cancelled' },
-  { topic: 'REFUNDS_CREATE',         uri: '/webhooks/refunds/create' },
-  { topic: 'BULK_OPERATIONS_FINISH', uri: '/webhooks/bulk/finish' },
+  { topic: 'ORDERS_PAID',              uri: '/webhooks/orders/paid' },
+  { topic: 'ORDERS_UPDATED',           uri: '/webhooks/orders/updated' },
+  { topic: 'ORDERS_CANCELLED',         uri: '/webhooks/orders/cancelled' },
+  { topic: 'REFUNDS_CREATE',           uri: '/webhooks/refunds/create' },
+  { topic: 'BULK_OPERATIONS_FINISH',   uri: '/webhooks/bulk/finish' },
+  { topic: 'APP_SUBSCRIPTIONS_UPDATE', uri: '/webhooks/app_subscriptions/update' },
 ];
 
 const WEBHOOK_CREATE_MUTATION = `
@@ -195,7 +197,16 @@ router.get('/auth/callback', async (req, res) => {
       console.error('registerWebhooks unexpected error:', err.message)
     );
 
-    // Redirect to admin UI
+    // Create billing subscription and redirect merchant to Shopify approval page
+    try {
+      const billing = await createBillingSubscription(shop, access_token);
+      if (billing.confirmationUrl) {
+        return res.redirect(billing.confirmationUrl);
+      }
+    } catch (err) {
+      console.error('createBillingSubscription error:', err.message);
+    }
+    // Fall through on billing error — don't block merchant indefinitely
     if (req.query.host) {
       res.redirect(`https://${shop}/admin/apps/${process.env.SHOPIFY_API_KEY}`);
     } else {

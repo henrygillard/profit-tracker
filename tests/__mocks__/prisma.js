@@ -2,6 +2,7 @@ const prisma = {
   shopSession: {
     deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
     findFirst: jest.fn().mockResolvedValue(null),
+    update: jest.fn().mockResolvedValue({}),
   },
   productCost: {
     create: jest.fn().mockResolvedValue({ id: 1 }),

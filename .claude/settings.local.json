@@ -102,7 +102,11 @@
       "Bash(railway status:*)",
       "Bash(railway connect:*)",
       "Bash(railway logs:*)",
-      "Bash(railway variable:*)"
+      "Bash(railway variable:*)",
+      "Skill(gsd:complete-milestone)",
+      "Bash(find /Users/henry/code/profit-tracker -type f -name \"prisma.schema\" -o -name \"schema.prisma\" -o -name \"*.sql\" 2>/dev/null | head -20)",
+      "Bash(grep -A 30 \"calculateOrderProfit\" /Users/henry/code/profit-tracker/tests/*.test.js 2>/dev/null | head -80)",
+      "Bash(node scripts/seed-demo.js)"
     ]
   }
 }

@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { apiFetch } from '../api.js';
-import CogsCoverage from './CogsCoverage.jsx';
+import React, { useState, useEffect } from "react";
+import { apiFetch } from "../api.js";
+import CogsCoverage from "./CogsCoverage.jsx";
 
 function formatCurrency(value) {
-  return Number(value).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  return Number(value).toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+  });
 }
 
 function computePreset(days) {
@@ -17,8 +20,8 @@ export default function Overview({ dateRange, onDateChange }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo] = useState('');
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
 
   useEffect(() => {
     if (!dateRange || !dateRange.from || !dateRange.to) return;
@@ -27,14 +30,14 @@ export default function Overview({ dateRange, onDateChange }) {
     setError(null);
 
     apiFetch(
-      `/api/dashboard/overview?from=${encodeURIComponent(dateRange.from)}&to=${encodeURIComponent(dateRange.to)}`
+      `/api/dashboard/overview?from=${encodeURIComponent(dateRange.from)}&to=${encodeURIComponent(dateRange.to)}`,
     )
       .then((result) => {
         setData(result);
         setLoading(false);
       })
       .catch((err) => {
-        setError('Could not load data. Reload to try again.');
+        setError("Could not load data. Reload to try again.");
         setLoading(false);
       });
   }, [dateRange && dateRange.from, dateRange && dateRange.to]);
@@ -59,9 +62,11 @@ export default function Overview({ dateRange, onDateChange }) {
           <button onClick={() => handlePreset(7)}>Last 7 days</button>
           <button onClick={() => handlePreset(30)}>Last 30 days</button>
           <button onClick={() => handlePreset(90)}>Last 90 days</button>
-          <span style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <span
+            style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}
+          >
             <label>
-              From:{' '}
+              From:{" "}
               <input
                 type="date"
                 value={customFrom}
@@ -69,7 +74,7 @@ export default function Overview({ dateRange, onDateChange }) {
               />
             </label>
             <label>
-              To:{' '}
+              To:{" "}
               <input
                 type="date"
                 value={customTo}
@@ -91,16 +96,20 @@ export default function Overview({ dateRange, onDateChange }) {
 
       {/* KPI cards */}
       {loading && <p>Loading...</p>}
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {error && <p style={{ color: "red" }}>{error}</p>}
       {!loading && !error && data && (
         <s-stack direction="horizontal" gap="400" wrap>
           <s-section heading="Revenue">
-            <s-text variant="heading-md">{formatCurrency(data.revenueNet)}</s-text>
+            <s-text variant="heading-md">
+              {formatCurrency(data.revenueNet)}{" "}
+            </s-text>
             <s-text variant="body-sm">{data.orderCount} orders</s-text>
           </s-section>
 
           <s-section heading="COGS">
-            <s-text variant="heading-md">{formatCurrency(data.cogsTotal)}</s-text>
+            <s-text variant="heading-md">
+              {formatCurrency(data.cogsTotal)}
+            </s-text>
             {data.isPartial && (
               <s-text variant="body-sm">
                 Partial ({data.missingCogsCount} orders excluded)
@@ -109,11 +118,15 @@ export default function Overview({ dateRange, onDateChange }) {
           </s-section>
 
           <s-section heading="Fees">
-            <s-text variant="heading-md">{formatCurrency(data.feesTotal)}</s-text>
+            <s-text variant="heading-md">
+              {formatCurrency(data.feesTotal)}
+            </s-text>
           </s-section>
 
           <s-section heading="Net Profit">
-            <s-text variant="heading-md">{formatCurrency(data.netProfit)}</s-text>
+            <s-text variant="heading-md">
+              {formatCurrency(data.netProfit)}
+            </s-text>
             {data.isPartial && (
               <s-text variant="body-sm">
                 Partial ({data.missingCogsCount} orders excluded)

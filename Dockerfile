@@ -5,11 +5,5 @@ COPY package*.json ./
 RUN npm install
 COPY . .
 RUN npx prisma generate
-# Build frontend
-WORKDIR /app/web
-COPY web/package*.json ./
-RUN npm install
-RUN npm run build
-WORKDIR /app
 EXPOSE 3000
 CMD ["node", "server.js"]

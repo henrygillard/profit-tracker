@@ -37,11 +37,11 @@ Requirements for MVP launch. Each maps to roadmap phases.
 
 ### Profit Dashboard
 
-- [ ] **DASH-01**: Merchant can view store-level profit overview (total revenue, total COGS, total fees, net profit) with date range filtering (daily / weekly / monthly / custom)
-- [ ] **DASH-02**: Merchant can view profit per order — sortable list showing revenue, COGS, fees, net profit, and margin % per order
-- [ ] **DASH-03**: Merchant can view profit per product/SKU — margin % per product with best and worst performers highlighted
-- [ ] **DASH-04**: Dashboard shows profit trend line chart over selected date range
-- [ ] **DASH-05**: Dashboard shows COGS coverage indicator — flags products/orders with missing COGS (NULL COGS never displays as $0)
+- [x] **DASH-01**: Merchant can view store-level profit overview (total revenue, total COGS, total fees, net profit) with date range filtering (daily / weekly / monthly / custom)
+- [x] **DASH-02**: Merchant can view profit per order — sortable list showing revenue, COGS, fees, net profit, and margin % per order
+- [x] **DASH-03**: Merchant can view profit per product/SKU — margin % per product with best and worst performers highlighted
+- [x] **DASH-04**: Dashboard shows profit trend line chart over selected date range
+- [x] **DASH-05**: Dashboard shows COGS coverage indicator — flags products/orders with missing COGS (NULL COGS never displays as $0)
 
 ### Billing
 
@@ -101,11 +101,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FEES-02 | Phase 2 | Complete |
 | FEES-03 | Phase 2 | Complete |
 | FEES-04 | Phase 2 | Complete |
-| DASH-01 | Phase 3 | Pending |
-| DASH-02 | Phase 3 | Pending |
-| DASH-03 | Phase 3 | Pending |
-| DASH-04 | Phase 3 | Pending |
-| DASH-05 | Phase 3 | Pending |
+| DASH-01 | Phase 3 | Complete |
+| DASH-02 | Phase 3 | Complete |
+| DASH-03 | Phase 3 | Complete |
+| DASH-04 | Phase 3 | Complete |
+| DASH-05 | Phase 3 | Complete |
 | BILL-01 | Phase 4 | Pending |
 
 **Coverage:**

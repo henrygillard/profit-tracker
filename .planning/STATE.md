@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 02-sync-and-profit-engine 02-07-PLAN.md
-last_updated: "2026-03-13T16:54:24.706Z"
+stopped_at: Completed 03-profit-dashboard 03-01-PLAN.md
+last_updated: "2026-03-14T02:54:55.421Z"
 last_activity: 2026-03-10 — Roadmap created, phases derived from requirements
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 16
+  completed_plans: 12
   percent: 25
 ---
 
@@ -61,6 +61,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 02-sync-and-profit-engine P06 | 5 | 2 tasks | 3 files |
 | Phase 02-sync-and-profit-engine P04 | 15 | 3 tasks | 3 files |
 | Phase 02-sync-and-profit-engine P07 | 3 | 3 tasks | 2 files |
+| Phase 03-profit-dashboard P01 | 8 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,8 @@ Recent decisions affecting current work:
 - [Phase 02-sync-and-profit-engine]: Webhook registration is fire-and-forget in OAuth callback — merchant redirect must not be blocked; errors logged non-fatal
 - [Phase 02-sync-and-profit-engine]: In-memory processedWebhooks Set with 30-min TTL — covers Shopify 15-min retry window without DB overhead at MVP scale
 - [Phase 02-sync-and-profit-engine]: bulk/finish skips deduplication — JSONL URL expires, bulk ops fire once, dedup would break retry on legitimate failure
+- [Phase 03-profit-dashboard]: Dashboard tests use mocked JWT middleware (always-authenticated pattern) — Nyquist compliance via 9 TDD RED stubs all failing with 404 before routes exist
+- [Phase 03-profit-dashboard]: prisma.$queryRaw goes at top level of mock object (not nested), matching real PrismaClient API surface
 
 ### Pending Todos
 
@@ -110,6 +113,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-13T16:50:50.822Z
-Stopped at: Completed 02-sync-and-profit-engine 02-07-PLAN.md
+Last session: 2026-03-14T02:54:55.416Z
+Stopped at: Completed 03-profit-dashboard 03-01-PLAN.md
 Resume file: None

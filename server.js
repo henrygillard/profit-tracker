@@ -85,7 +85,26 @@ app.get('/admin', async (req, res) => {
     }
     const billing = await createBillingSubscription(shop, session.accessToken);
     if (billing.confirmationUrl) {
-      return res.redirect(billing.confirmationUrl);
+      const url = billing.confirmationUrl;
+      const apiKey = process.env.SHOPIFY_API_KEY;
+      return res.send(`<!DOCTYPE html><html><head>
+        <meta charset="UTF-8">
+        <meta name="shopify-api-key" content="${apiKey}" />
+        <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+        <style>
+          body{display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f6f6f7}
+          .card{background:#fff;padding:2rem 2.5rem;border-radius:12px;text-align:center;max-width:420px;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+          h2{margin:0 0 .75rem;font-size:1.25rem;color:#202223}
+          p{margin:0 0 1.5rem;color:#6d7175;line-height:1.5}
+          a{display:inline-block;background:#008060;color:#fff;padding:.75rem 1.5rem;border-radius:6px;text-decoration:none;font-weight:600;font-size:.9rem}
+        </style>
+      </head><body>
+        <div class="card">
+          <h2>Subscription required</h2>
+          <p>Profit Tracker requires an active subscription to continue.</p>
+          <a href="${url}" target="_top">Approve subscription &rarr;</a>
+        </div>
+      </body></html>`);
     }
     // Billing error fallthrough — serve app (don't block merchant indefinitely)
     return res.sendFile(path.join(__dirname, 'public', 'app', 'index.html'));

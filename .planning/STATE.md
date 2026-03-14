@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 04-billing 04-01-PLAN.md
-last_updated: "2026-03-14T16:11:51.466Z"
+stopped_at: Completed 04-billing 04-02-PLAN.md
+last_updated: "2026-03-14T16:20:56.674Z"
 last_activity: 2026-03-10 — Roadmap created, phases derived from requirements
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 19
-  completed_plans: 17
+  completed_plans: 18
   percent: 25
 ---
 
@@ -67,6 +67,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 03-profit-dashboard P04 | 3 | 2 tasks | 6 files |
 | Phase 03-profit-dashboard P05 | 5 | 2 tasks | 1 files |
 | Phase 04-billing P01 | 9 | 2 tasks | 3 files |
+| Phase 04-billing P02 | 442 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -115,6 +116,8 @@ Recent decisions affecting current work:
 - [Phase 04-billing]: Wave 0 TDD approach: import routes/billing.js at test file top level — MODULE_NOT_FOUND causes test suite to fail RED cleanly
 - [Phase 04-billing]: Migration SQL created manually (non-interactive env blocks prisma migrate dev) — npx prisma generate regenerates client from schema
 - [Phase 04-billing]: billingStatus and subscriptionId added as nullable String? to ShopSession — values ACTIVE | INACTIVE | null
+- [Phase 04-billing]: billingWebhookRouter exported from routes/billing.js for test contract compatibility — webhooks.js imports checkBillingStatus and duplicates handler inline for production routing
+- [Phase 04-billing]: routes/billing mock uses jest.requireActual for billingWebhookRouter — preserves real HMAC logic in tests while making createBillingSubscription/checkBillingStatus jest.fn() mockable
 
 ### Pending Todos
 
@@ -129,6 +132,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-14T16:11:51.461Z
-Stopped at: Completed 04-billing 04-01-PLAN.md
+Last session: 2026-03-14T16:20:56.668Z
+Stopped at: Completed 04-billing 04-02-PLAN.md
 Resume file: None

@@ -67,7 +67,29 @@
       "Bash(node \"$HOME/.claude/get-shit-done/bin/gsd-tools.cjs\" commit \"docs\\(phase-3\\): add validation strategy\" --files \".planning/phases/03-profit-dashboard/03-VALIDATION.md\" 2>&1 || true)",
       "Bash(node \"$HOME/.claude/get-shit-done/bin/gsd-tools.cjs\" frontmatter validate \".planning/phases/03-profit-dashboard/03-01-PLAN.md\" --schema plan 2>/dev/null)",
       "Bash(node \"$HOME/.claude/get-shit-done/bin/gsd-tools.cjs\" verify plan-structure \".planning/phases/03-profit-dashboard/03-05-PLAN.md\" 2>/dev/null)",
-      "Bash(node \"$HOME/.claude/get-shit-done/bin/gsd-tools.cjs\" commit \"docs\\(phase-3\\): add research and plans\" --files \".planning/phases/03-profit-dashboard/03-RESEARCH.md .planning/phases/03-profit-dashboard/03-01-PLAN.md .planning/phases/03-profit-dashboard/03-02-PLAN.md .planning/phases/03-profit-dashboard/03-03-PLAN.md .planning/phases/03-profit-dashboard/03-04-PLAN.md .planning/phases/03-profit-dashboard/03-05-PLAN.md\" 2>&1 || true)"
+      "Bash(node \"$HOME/.claude/get-shit-done/bin/gsd-tools.cjs\" commit \"docs\\(phase-3\\): add research and plans\" --files \".planning/phases/03-profit-dashboard/03-RESEARCH.md .planning/phases/03-profit-dashboard/03-01-PLAN.md .planning/phases/03-profit-dashboard/03-02-PLAN.md .planning/phases/03-profit-dashboard/03-03-PLAN.md .planning/phases/03-profit-dashboard/03-04-PLAN.md .planning/phases/03-profit-dashboard/03-05-PLAN.md\" 2>&1 || true)",
+      "Bash(git -C /Users/henry/code/profit-tracker remote -v)",
+      "Bash(cd /Users/henry/code/profit-tracker/web && npm run build 2>&1)",
+      "Bash(git -C /Users/henry/code/profit-tracker status shopify.app.profit-tracker.toml && git diff shopify.app.profit-tracker.toml)",
+      "Bash(git -C /Users/henry/code/profit-tracker ls-files --error-unmatch shopify.app.profit-tracker.toml 2>&1 || echo \"untracked\")",
+      "Bash(git -C /Users/henry/code/profit-tracker status public/app/assets/)",
+      "Bash(git push:*)",
+      "Bash(git -C /Users/henry/code/profit-tracker log --oneline -10 2>/dev/null || echo \"No git repo found\")",
+      "Bash(node \"$HOME/.claude/get-shit-done/bin/gsd-tools.cjs\" state record-metric --phase \"03-profit-dashboard\" --plan \"05\" --duration \"5\" --tasks \"2\" --files \"1\" 2>&1)",
+      "Bash(node \"$HOME/.claude/get-shit-done/bin/gsd-tools.cjs\" state add-decision --phase \"03-profit-dashboard\" --summary \"res.sendFile replaces inline HTML placeholder in /admin route — session check and redirect preserved, no wildcard catch-all to avoid intercepting API routes\" 2>&1)",
+      "Bash(node \"$HOME/.claude/get-shit-done/bin/gsd-tools.cjs\" state record-session --stopped-at \"Completed 03-profit-dashboard 03-05-PLAN.md\" 2>&1)",
+      "Bash(node \"$HOME/.claude/get-shit-done/bin/gsd-tools.cjs\" roadmap update-plan-progress \"3\" 2>&1)",
+      "Bash(node \"$HOME/.claude/get-shit-done/bin/gsd-tools.cjs\" requirements mark-complete DASH-01 DASH-02 DASH-03 DASH-04 DASH-05 2>&1)",
+      "Bash(git -C /Users/henry/code/profit-tracker log --oneline --all | grep -q \"f7fb2ba\" && echo \"FOUND: f7fb2ba\" || echo \"MISSING: f7fb2ba\")",
+      "Bash(cat /Users/henry/code/profit-tracker/.planning/phases/03-profit-dashboard/*-VERIFICATION.md 2>/dev/null || echo \"No previous verification found\")",
+      "Bash(node \"$HOME/.claude/get-shit-done/bin/gsd-tools.cjs\" roadmap get-phase \"03\" --raw 2>/dev/null || echo \"gsd-tools not available or phase not found\")",
+      "Bash(npm test:*)",
+      "Bash(node \"$HOME/.claude/get-shit-done/bin/gsd-tools.cjs\" commit \"docs\\(phase-03\\): complete phase execution\" --files .planning/ROADMAP.md .planning/STATE.md .planning/REQUIREMENTS.md .planning/phases/03-profit-dashboard/03-VERIFICATION.md)",
+      "Bash(node \"$HOME/.claude/get-shit-done/bin/gsd-tools.cjs\" requirements mark-complete BILL-01 2>&1)",
+      "Bash(node \"$HOME/.claude/get-shit-done/bin/gsd-tools.cjs\" state record-session --stopped-at \"Completed 04-billing 04-03-PLAN.md\" 2>&1)",
+      "Bash(railway variables:*)",
+      "Bash(railway whoami:*)",
+      "Bash(railway up:*)"
     ]
   }
 }

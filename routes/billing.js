@@ -25,12 +25,14 @@ const CREATE_SUBSCRIPTION_MUTATION = `
     $lineItems: [AppSubscriptionLineItemInput!]!
     $returnUrl: URL!
     $trialDays: Int
+    $test: Boolean
   ) {
     appSubscriptionCreate(
       name: $name
       lineItems: $lineItems
       returnUrl: $returnUrl
       trialDays: $trialDays
+      test: $test
     ) {
       userErrors { field message }
       appSubscription { id status trialDays }
@@ -68,6 +70,7 @@ async function createBillingSubscription(shop, accessToken) {
       name: 'Profit Tracker $29/month',
       returnUrl: `${process.env.SHOPIFY_APP_URL}/admin?shop=${encodeURIComponent(shop)}`,
       trialDays: 7,
+      test: process.env.BILLING_TEST_MODE === 'true',
       lineItems: [
         {
           plan: {

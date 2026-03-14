@@ -103,6 +103,17 @@ None - no external service configuration required.
 - Migration SQL ready for `npx prisma migrate deploy` on Railway before Plan 04-02 ships
 - 8 tests fail RED, all for the right reason (missing routes/billing.js)
 
+## Self-Check: PASSED
+
+- tests/billing.test.js: FOUND
+- prisma/schema.prisma: FOUND (billingStatus + subscriptionId confirmed)
+- migration.sql: FOUND
+- 04-01-SUMMARY.md: FOUND
+- Commit 115b125 (test stubs): FOUND
+- Commit 46d1c56 (schema extension): FOUND
+- 51 prior tests: GREEN
+- 8 billing tests: FAIL RED (MODULE_NOT_FOUND — expected)
+
 ---
 *Phase: 04-billing*
 *Completed: 2026-03-14*

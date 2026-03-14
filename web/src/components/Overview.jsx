@@ -162,41 +162,28 @@ export default function Overview({ dateRange, onDateChange }) {
       {!loading && !error && data && (
         <s-stack direction="horizontal" gap="400" wrap>
           <s-section heading="Revenue">
-            <s-text variant="heading-md">
-              {formatCurrency(data.revenueNet)}
-            </s-text>
-            <br />
-            <s-text variant="body-sm">{data.orderCount} orders</s-text>
+            <div><s-text variant="heading-md">{formatCurrency(data.revenueNet)}</s-text></div>
+            <div><s-text variant="body-sm">{data.orderCount} orders</s-text></div>
           </s-section>
 
           <s-section heading="COGS">
             <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-              <s-text variant="heading-md">
-                {formatCurrency(data.cogsTotal)}
-              </s-text>
+              <s-text variant="heading-md">{formatCurrency(data.cogsTotal)}</s-text>
               <InfoTooltip lines={COGS_TOOLTIP} />
             </div>
             {data.isPartial && (
-              <s-text variant="body-sm">
-                Partial ({data.missingCogsCount} orders excluded)
-              </s-text>
+              <div><s-text variant="body-sm">Partial ({data.missingCogsCount} orders excluded)</s-text></div>
             )}
           </s-section>
 
           <s-section heading="Fees">
-            <s-text variant="heading-md">
-              {formatCurrency(data.feesTotal)}
-            </s-text>
+            <div><s-text variant="heading-md">{formatCurrency(data.feesTotal)}</s-text></div>
           </s-section>
 
           <s-section heading="Net Profit">
-            <s-text variant="heading-md">
-              {formatCurrency(data.netProfit)}
-            </s-text>
+            <div><s-text variant="heading-md">{formatCurrency(data.netProfit)}</s-text></div>
             {data.isPartial && (
-              <s-text variant="body-sm">
-                Partial ({data.missingCogsCount} orders excluded)
-              </s-text>
+              <div><s-text variant="body-sm">Partial ({data.missingCogsCount} orders excluded)</s-text></div>
             )}
           </s-section>
         </s-stack>

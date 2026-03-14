@@ -74,44 +74,7 @@ app.get('/admin', async (req, res) => {
     return res.redirect(`/auth?shop=${encodeURIComponent(shop)}`);
   }
 
-  res.send(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>profit tracker</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f6f6f7;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .card {
-      background: white;
-      border-radius: 12px;
-      padding: 48px 56px;
-      text-align: center;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
-      max-width: 480px;
-      width: 100%;
-    }
-    h1 { font-size: 28px; color: #1a1a2e; margin-bottom: 12px; }
-    p { font-size: 15px; color: #6b7280; line-height: 1.5; }
-    .shop { margin-top: 24px; font-size: 13px; color: #9ca3af; font-family: monospace; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h1>Welcome to profit tracker</h1>
-    <p>Your app is installed and ready. Start building features here.</p>
-    <div class="shop">${shop}</div>
-  </div>
-</body>
-</html>`);
+  res.sendFile(path.join(__dirname, 'public', 'app', 'index.html'));
 });
 
 // Root redirect: if shop param present, go to /admin; else show install prompt

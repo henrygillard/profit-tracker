@@ -101,8 +101,8 @@ app.get('/admin', async (req, res) => {
       </head><body>
         <div class="card">
           <h2>Subscription required</h2>
-          <p>Profit Tracker requires an active subscription to continue.</p>
-          <a href="${url}" target="_top">Approve subscription &rarr;</a>
+          <p>Profit Tracker is $29/month. Start with a 7-day free trial — no charge until your trial ends.</p>
+          <a href="${url}" target="_top">Start free trial &rarr;</a>
         </div>
       </body></html>`);
     }

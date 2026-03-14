@@ -201,7 +201,7 @@ router.get('/auth/callback', async (req, res) => {
     try {
       const billing = await createBillingSubscription(shop, access_token);
       if (billing.confirmationUrl) {
-        return res.redirect(billing.confirmationUrl);
+        return res.send(`<!DOCTYPE html><html><head><script>window.top.location.href=${JSON.stringify(billing.confirmationUrl)};</script></head><body>Redirecting to billing...</body></html>`);
       }
     } catch (err) {
       console.error('createBillingSubscription error:', err.message);

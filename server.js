@@ -84,7 +84,9 @@ app.get('/admin', async (req, res) => {
       return res.sendFile(path.join(__dirname, 'public', 'app', 'index.html'));
     }
     const billing = await createBillingSubscription(shop, session.accessToken);
-    if (billing.confirmationUrl) return res.redirect(billing.confirmationUrl);
+    if (billing.confirmationUrl) {
+      return res.send(`<!DOCTYPE html><html><head><script>window.top.location.href=${JSON.stringify(billing.confirmationUrl)};</script></head><body>Redirecting to billing...</body></html>`);
+    }
     // Billing error fallthrough — serve app (don't block merchant indefinitely)
     return res.sendFile(path.join(__dirname, 'public', 'app', 'index.html'));
   }

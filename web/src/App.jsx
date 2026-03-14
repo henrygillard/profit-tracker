@@ -1,4 +1,9 @@
 import React, { useState } from 'react';
+import Overview from './components/Overview.jsx';
+import CogsCoverage from './components/CogsCoverage.jsx';
+import TrendChart from './components/TrendChart.jsx';
+import OrdersTable from './components/OrdersTable.jsx';
+import ProductsTable from './components/ProductsTable.jsx';
 
 function getDefaultDateRange() {
   const to = new Date();
@@ -40,17 +45,24 @@ export default function App() {
     setView(newView);
   }
 
+  function handleDateChange(newRange) {
+    setDateRange(newRange);
+  }
+
   function renderView() {
     switch (view) {
       case 'orders':
-        return <p>Orders view coming in next plan.</p>;
+        return <OrdersTable dateRange={dateRange} />;
       case 'products':
-        return <p>Products view coming in next plan.</p>;
-      case 'trend':
-        return <p>Trend view coming in next plan.</p>;
+        return <ProductsTable dateRange={dateRange} />;
       case 'overview':
       default:
-        return <p>Overview coming in next plan.</p>;
+        return (
+          <div>
+            <Overview dateRange={dateRange} onDateChange={handleDateChange} />
+            <TrendChart dateRange={dateRange} />
+          </div>
+        );
     }
   }
 
@@ -63,22 +75,26 @@ export default function App() {
       )}
       <s-section>
         <nav style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-          <button onClick={() => handleNav('overview')} aria-current={view === 'overview' ? 'page' : undefined}>
+          <button
+            onClick={() => handleNav('overview')}
+            aria-current={view === 'overview' ? 'page' : undefined}
+          >
             Overview
           </button>
-          <button onClick={() => handleNav('orders')} aria-current={view === 'orders' ? 'page' : undefined}>
+          <button
+            onClick={() => handleNav('orders')}
+            aria-current={view === 'orders' ? 'page' : undefined}
+          >
             Orders
           </button>
-          <button onClick={() => handleNav('products')} aria-current={view === 'products' ? 'page' : undefined}>
+          <button
+            onClick={() => handleNav('products')}
+            aria-current={view === 'products' ? 'page' : undefined}
+          >
             Products
           </button>
-          <button onClick={() => handleNav('trend')} aria-current={view === 'trend' ? 'page' : undefined}>
-            Trend
-          </button>
         </nav>
-        <div>
-          {renderView()}
-        </div>
+        <div>{renderView()}</div>
       </s-section>
     </s-page>
   );

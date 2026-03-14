@@ -45,7 +45,7 @@ Requirements for MVP launch. Each maps to roadmap phases.
 
 ### Billing
 
-- [ ] **BILL-01**: App uses Shopify Billing API to charge merchants $29/month via a single recurring subscription plan before granting full access
+- [x] **BILL-01**: App uses Shopify Billing API to charge merchants $29/month via a single recurring subscription plan before granting full access
 
 ## v2 Requirements
 
@@ -106,7 +106,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DASH-03 | Phase 3 | Complete |
 | DASH-04 | Phase 3 | Complete |
 | DASH-05 | Phase 3 | Complete |
-| BILL-01 | Phase 4 | Pending |
+| BILL-01 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 22 total

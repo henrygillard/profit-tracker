@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 4 context gathered
-last_updated: "2026-03-14T15:42:27.403Z"
+stopped_at: Completed 04-billing 04-01-PLAN.md
+last_updated: "2026-03-14T16:11:51.466Z"
 last_activity: 2026-03-10 — Roadmap created, phases derived from requirements
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 16
-  completed_plans: 16
+  total_plans: 19
+  completed_plans: 17
   percent: 25
 ---
 
@@ -66,6 +66,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 03-profit-dashboard P03 | 3 | 2 tasks | 7 files |
 | Phase 03-profit-dashboard P04 | 3 | 2 tasks | 6 files |
 | Phase 03-profit-dashboard P05 | 5 | 2 tasks | 1 files |
+| Phase 04-billing P01 | 9 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -111,6 +112,9 @@ Recent decisions affecting current work:
 - [Phase 03-profit-dashboard]: OrdersTable resets page and allOrders to [] on dateRange or sort change to prevent stale pages from contaminating new results
 - [Phase 03-profit-dashboard]: useEffect deps use primitive dateRange.from/dateRange.to fields (not object reference) to avoid spurious re-fetches
 - [Phase 03-profit-dashboard]: res.sendFile replaces inline HTML placeholder in /admin route — session check and redirect preserved, no wildcard catch-all to avoid intercepting API routes
+- [Phase 04-billing]: Wave 0 TDD approach: import routes/billing.js at test file top level — MODULE_NOT_FOUND causes test suite to fail RED cleanly
+- [Phase 04-billing]: Migration SQL created manually (non-interactive env blocks prisma migrate dev) — npx prisma generate regenerates client from schema
+- [Phase 04-billing]: billingStatus and subscriptionId added as nullable String? to ShopSession — values ACTIVE | INACTIVE | null
 
 ### Pending Todos
 
@@ -125,6 +129,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-14T15:42:27.398Z
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-billing/04-CONTEXT.md
+Last session: 2026-03-14T16:11:51.461Z
+Stopped at: Completed 04-billing 04-01-PLAN.md
+Resume file: None

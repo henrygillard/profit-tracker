@@ -2,7 +2,7 @@
 
 client_id = "b4a0a98bc37928c4fde24564213c848a"
 name = "profit tracker"
-application_url = "https://PLACEHOLDER.up.railway.app"
+application_url = "https://profit-tracker-production.up.railway.app"
 embedded = true
 
 [webhooks]
@@ -25,4 +25,4 @@ shop_deletion_url = "/webhooks/shop/redact"
 scopes = ""
 
 [auth]
-redirect_urls = ["https://PLACEHOLDER.up.railway.app/auth/callback"]
+redirect_urls = ["https://profit-tracker-production.up.railway.app/auth/callback"]

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 03-profit-dashboard 03-02-PLAN.md
-last_updated: "2026-03-14T03:00:26.625Z"
+stopped_at: Completed 03-profit-dashboard 03-03-PLAN.md
+last_updated: "2026-03-14T03:07:07.378Z"
 last_activity: 2026-03-10 — Roadmap created, phases derived from requirements
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 16
-  completed_plans: 13
+  completed_plans: 14
   percent: 25
 ---
 
@@ -63,6 +63,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 02-sync-and-profit-engine P07 | 3 | 3 tasks | 2 files |
 | Phase 03-profit-dashboard P01 | 8 | 2 tasks | 2 files |
 | Phase 03-profit-dashboard P02 | 4 | 2 tasks | 1 files |
+| Phase 03-profit-dashboard P03 | 3 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -102,6 +103,9 @@ Recent decisions affecting current work:
 - [Phase 03-profit-dashboard]: prisma.$queryRaw goes at top level of mock object (not nested), matching real PrismaClient API surface
 - [Phase 03-profit-dashboard]: Dual-aggregate pattern for overview: separate aggregates for all-orders (revenue/fees) and cogsKnown=true orders (COGS/netProfit) prevents NULL poisoning
 - [Phase 03-profit-dashboard]: Dual key casing in $queryRaw mapping (snake_case ?? camelCase) supports real Postgres column names and Jest mock camelCase keys without test changes
+- [Phase 03-profit-dashboard]: Used create-vite@4 (not v9) for Node 16.20.2 compatibility — v9 requires Node 20+
+- [Phase 03-profit-dashboard]: Removed StrictMode from main.jsx — App Bridge embedded context incompatible with double-invoke behavior
+- [Phase 03-profit-dashboard]: App Bridge CDN first script in head (hard requirement for window.shopify global), Polaris CDN second, no @shopify npm packages
 
 ### Pending Todos
 
@@ -116,6 +120,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-14T03:00:26.618Z
-Stopped at: Completed 03-profit-dashboard 03-02-PLAN.md
+Last session: 2026-03-14T03:07:07.370Z
+Stopped at: Completed 03-profit-dashboard 03-03-PLAN.md
 Resume file: None

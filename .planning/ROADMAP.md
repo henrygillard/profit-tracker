@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Data Foundation** - App review blockers cleared, schema extended, all API routes secured with JWT auth (completed 2026-03-11)
 - [ ] **Phase 2: Sync and Profit Engine** - Orders, products, and payouts synced; profit calculated correctly at write time
-- [ ] **Phase 3: Profit Dashboard** - React SPA rendering real profit data for merchants within 10 minutes of install
+- [x] **Phase 3: Profit Dashboard** - React SPA rendering real profit data for merchants within 10 minutes of install (completed 2026-03-14)
 - [ ] **Phase 4: Billing** - Shopify Billing API enforcing $29/month subscription before granting full access
 
 ## Phase Details
@@ -95,5 +95,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Data Foundation | 4/4 | Complete   | 2026-03-11 |
 | 2. Sync and Profit Engine | 5/6 | In Progress|  |
-| 3. Profit Dashboard | 4/5 | In Progress|  |
+| 3. Profit Dashboard | 5/5 | Complete   | 2026-03-14 |
 | 4. Billing | 0/TBD | Not started | - |

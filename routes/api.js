@@ -159,4 +159,93 @@ router.post('/sync/payouts', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/dashboard/overview — Store-level profit overview (DASH-01, DASH-05)
+ * Query params: from (ISO datetime), to (ISO datetime)
+ * Returns: { revenueNet, feesTotal, cogsTotal, netProfit, orderCount, cogsKnownCount, missingCogsCount, isPartial }
+ * - revenueNet and feesTotal aggregate ALL orders (including unknown-COGS)
+ * - cogsTotal and netProfit aggregate ONLY cogsKnown=true orders (no NULL poisoning)
+ * - isPartial = true when any orders have unknown COGS
+ */
+router.get('/dashboard/overview', async (req, res) => {
+  const { from, to } = req.query;
+  if (!from || !to) {
+    return res.status(400).json({ error: 'from and to query params required' });
+  }
+
+  const dateFilter = { gte: new Date(from), lte: new Date(to) };
+  const baseWhere = {
+    shop: req.shopDomain,
+    order: { processedAt: dateFilter },
+  };
+
+  const [agg, missingCogs] = await Promise.all([
+    prisma.orderProfit.aggregate({
+      where: baseWhere,
+      _sum: { revenueNet: true, feesTotal: true, shippingCost: true },
+      _count: { _all: true },
+    }),
+    prisma.orderProfit.count({ where: { ...baseWhere, cogsKnown: false } }),
+  ]);
+
+  // Sum cogsTotal and netProfit for known-COGS orders only (avoids NULL poisoning)
+  const knownAgg = await prisma.orderProfit.aggregate({
+    where: { ...baseWhere, cogsKnown: true },
+    _sum: { cogsTotal: true, netProfit: true },
+    _count: { _all: true },
+  });
+
+  return res.json({
+    revenueNet: Number(agg._sum.revenueNet ?? 0),
+    feesTotal: Number(agg._sum.feesTotal ?? 0),
+    cogsTotal: Number(knownAgg._sum.cogsTotal ?? 0),
+    netProfit: Number(knownAgg._sum.netProfit ?? 0),
+    orderCount: agg._count._all,
+    cogsKnownCount: knownAgg._count._all,
+    missingCogsCount: missingCogs,
+    isPartial: missingCogs > 0,
+  });
+});
+
+/**
+ * GET /api/dashboard/orders — Paginated, sortable order profit list (DASH-02, DASH-05)
+ * Query params: from, to, sort (allowlisted), dir (asc|desc), page (0-indexed)
+ * Returns array of order profit rows — cogsTotal is null (not 0) for unknown-COGS orders
+ */
+router.get('/dashboard/orders', async (req, res) => {
+  const { from, to, sort = 'processedAt', dir = 'desc', page = 0 } = req.query;
+  const PAGE_SIZE = 50;
+
+  const ALLOWED_SORT = ['revenueNet', 'cogsTotal', 'feesTotal', 'netProfit', 'processedAt'];
+  const sortKey = ALLOWED_SORT.includes(sort) ? sort : 'processedAt';
+  const sortDir = dir === 'asc' ? 'asc' : 'desc';
+
+  const orders = await prisma.orderProfit.findMany({
+    where: {
+      shop: req.shopDomain,
+      order: { processedAt: { gte: new Date(from), lte: new Date(to) } },
+    },
+    include: { order: { select: { shopifyOrderName: true, processedAt: true } } },
+    orderBy: sortKey === 'processedAt'
+      ? { order: { processedAt: sortDir } }
+      : { [sortKey]: sortDir },
+    take: PAGE_SIZE,
+    skip: Number(page) * PAGE_SIZE,
+  });
+
+  return res.json(orders.map(op => ({
+    orderId: op.orderId,
+    shopifyOrderName: op.order ? op.order.shopifyOrderName : null,
+    processedAt: op.order ? op.order.processedAt : null,
+    revenueNet: Number(op.revenueNet),
+    cogsTotal: op.cogsTotal !== null ? Number(op.cogsTotal) : null,
+    feesTotal: Number(op.feesTotal),
+    netProfit: op.netProfit !== null ? Number(op.netProfit) : null,
+    marginPct: op.revenueNet && op.netProfit !== null
+      ? (Number(op.netProfit) / Number(op.revenueNet)) * 100
+      : null,
+    cogsKnown: op.cogsKnown,
+  })));
+});
+
 module.exports = router;

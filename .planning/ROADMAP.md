@@ -67,7 +67,14 @@ Plans:
   3. A merchant can see profit and margin % per product/SKU with best and worst performers ranked
   4. The dashboard shows a profit trend line chart over the selected date range
   5. The dashboard displays a COGS coverage indicator — products and orders with missing COGS are visibly flagged and never shown as $0 profit
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Test scaffold: failing dashboard.test.js stubs for all 9 DASH-01–05 backend behaviors (Wave 1)
+- [ ] 03-02-PLAN.md — Backend API routes: four GET /api/dashboard/* endpoints in routes/api.js (Wave 2)
+- [ ] 03-03-PLAN.md — Frontend setup: Vite+React SPA scaffold, App Bridge + Polaris CDN, api.js, App.jsx shell (Wave 3)
+- [ ] 03-04-PLAN.md — Dashboard components: Overview, OrdersTable, ProductsTable, TrendChart, CogsCoverage (Wave 4)
+- [ ] 03-05-PLAN.md — Wire + verify: server.js /admin serves SPA, human checkpoint of working dashboard (Wave 5)
 
 ### Phase 4: Billing
 **Goal**: The app charges merchants $29/month via Shopify Billing API before granting access to the profit dashboard — the app is ready for App Store submission
@@ -88,5 +95,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Data Foundation | 4/4 | Complete   | 2026-03-11 |
 | 2. Sync and Profit Engine | 5/6 | In Progress|  |
-| 3. Profit Dashboard | 0/TBD | Not started | - |
+| 3. Profit Dashboard | 0/5 | Not started | - |
 | 4. Billing | 0/TBD | Not started | - |

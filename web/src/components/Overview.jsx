@@ -101,8 +101,9 @@ export default function Overview({ dateRange, onDateChange }) {
         <s-stack direction="horizontal" gap="400" wrap>
           <s-section heading="Revenue">
             <s-text variant="heading-md">
-              {formatCurrency(data.revenueNet)}{" "}
+              {formatCurrency(data.revenueNet)}
             </s-text>
+            <br />
             <s-text variant="body-sm">{data.orderCount} orders</s-text>
           </s-section>
 

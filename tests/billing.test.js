@@ -336,6 +336,7 @@ describe('BILL-01 Test 7: billing webhook with valid HMAC', () => {
       .post('/webhooks/app_subscriptions/update')
       .set('Content-Type', 'application/json')
       .set('X-Shopify-Hmac-Sha256', hmac)
+      .set('X-Shopify-Shop-Domain', 'test-shop.myshopify.com')
       .send(body);
 
     expect(res.status).toBe(200);

@@ -201,7 +201,16 @@ router.get('/auth/callback', async (req, res) => {
     try {
       const billing = await createBillingSubscription(shop, access_token);
       if (billing.confirmationUrl) {
-        return res.send(`<!DOCTYPE html><html><head><script>window.top.location.href=${JSON.stringify(billing.confirmationUrl)};</script></head><body>Redirecting to billing...</body></html>`);
+        const host = req.query.host || '';
+        const apiKey = process.env.SHOPIFY_API_KEY;
+        const url = billing.confirmationUrl;
+        return res.send(`<!DOCTYPE html><html><head>
+          <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+          <script>
+            var app = ShopifyAppBridge.createApp({ apiKey: ${JSON.stringify(apiKey)}, host: ${JSON.stringify(host)} });
+            ShopifyAppBridge.actions.Redirect.create(app).dispatch(ShopifyAppBridge.actions.Redirect.Action.REMOTE, ${JSON.stringify(url)});
+          </script>
+        </head><body>Redirecting to billing...</body></html>`);
       }
     } catch (err) {
       console.error('createBillingSubscription error:', err.message);

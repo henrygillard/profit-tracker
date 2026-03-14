@@ -7,5 +7,14 @@ const prisma = {
     create: jest.fn().mockResolvedValue({ id: 1 }),
     findFirst: jest.fn().mockResolvedValue(null),
   },
+  orderProfit: {
+    aggregate: jest.fn().mockResolvedValue({
+      _sum: { revenueNet: null, feesTotal: null, shippingCost: null },
+      _count: { _all: 0 },
+    }),
+    count: jest.fn().mockResolvedValue(0),
+    findMany: jest.fn().mockResolvedValue([]),
+  },
+  $queryRaw: jest.fn().mockResolvedValue([]),
 };
 module.exports = { prisma };

@@ -248,4 +248,106 @@ router.get('/dashboard/orders', async (req, res) => {
   })));
 });
 
+/**
+ * GET /api/dashboard/products — Per-variant profit ranking (DASH-03)
+ * Query params: from, to
+ * Returns array sorted by net profit attributed DESC NULLS LAST.
+ * Uses $queryRaw with proportional attribution SQL (line item revenue share of order profit).
+ */
+router.get('/dashboard/products', async (req, res) => {
+  const { from, to } = req.query;
+  if (!from || !to) {
+    return res.status(400).json({ error: 'from and to query params required' });
+  }
+
+  const results = await prisma.$queryRaw`
+    SELECT
+      li.variant_id,
+      li.sku,
+      COUNT(DISTINCT li.order_id) AS order_count,
+      SUM(li.unit_price * li.quantity) AS revenue,
+      SUM(op.net_profit * (li.unit_price * li.quantity) / NULLIF(op.revenue_net, 0)) AS net_profit_attr,
+      BOOL_AND(op.cogs_known) AS all_cogs_known
+    FROM line_items li
+    JOIN orders o ON o.id = li.order_id
+    JOIN order_profits op ON op.order_id = li.order_id
+    WHERE o.shop = ${req.shopDomain}
+      AND o.processed_at >= ${new Date(from)}
+      AND o.processed_at <= ${new Date(to)}
+    GROUP BY li.variant_id, li.sku
+    ORDER BY net_profit_attr DESC NULLS LAST
+  `;
+
+  return res.json(results.map(r => {
+    // Support both snake_case (real Postgres) and camelCase (test mocks)
+    const variantId = r.variant_id ?? r.variantId ?? null;
+    const sku = r.sku ?? null;
+    const orderCount = Number(r.order_count ?? r.orderCount ?? 0);
+    const revenue = Number(r.revenue ?? 0);
+    const rawNetProfit = r.net_profit_attr ?? r.netProfitAttributed ?? null;
+    const rawAllCogsKnown = r.all_cogs_known ?? r.allCogsKnown ?? false;
+
+    const netProfitAttributed = rawNetProfit !== null ? Number(rawNetProfit) : null;
+    const marginPct = revenue && netProfitAttributed !== null
+      ? (netProfitAttributed / revenue) * 100
+      : null;
+
+    return {
+      variantId,
+      sku,
+      orderCount,
+      revenue,
+      netProfitAttributed,
+      marginPct,
+      allCogsKnown: rawAllCogsKnown,
+    };
+  }));
+});
+
+/**
+ * GET /api/dashboard/trend — Daily net profit trend buckets (DASH-04)
+ * Query params: from, to
+ * Returns array sorted by date ASC.
+ * Uses $queryRaw with DATE_TRUNC. BigInt SUM results converted with Number().
+ */
+router.get('/dashboard/trend', async (req, res) => {
+  const { from, to } = req.query;
+  if (!from || !to) {
+    return res.status(400).json({ error: 'from and to query params required' });
+  }
+
+  const trend = await prisma.$queryRaw`
+    SELECT
+      DATE_TRUNC('day', o.processed_at) AS date,
+      SUM(op.net_profit) AS net_profit,
+      SUM(op.revenue_net) AS revenue
+    FROM order_profits op
+    JOIN orders o ON o.id = op.order_id
+    WHERE op.shop = ${req.shopDomain}
+      AND o.processed_at >= ${new Date(from)}
+      AND o.processed_at <= ${new Date(to)}
+    GROUP BY DATE_TRUNC('day', o.processed_at)
+    ORDER BY date ASC
+  `;
+
+  const serialized = trend.map(row => {
+    // Support both real Postgres (Date object, snake_case, BigInt) and test mocks (string, camelCase, number)
+    const rawDate = row.date;
+    const dateStr = rawDate instanceof Date
+      ? rawDate.toISOString().slice(0, 10)
+      : String(rawDate).slice(0, 10);
+
+    const rawNetProfit = row.net_profit ?? row.netProfit ?? 0;
+    const rawRevenue = row.revenue ?? 0;
+
+    return {
+      date: dateStr,
+      netProfit: Number(rawNetProfit),
+      revenue: Number(rawRevenue),
+    };
+  });
+
+  return res.json(serialized);
+});
+
 module.exports = router;

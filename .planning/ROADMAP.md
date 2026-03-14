@@ -84,7 +84,12 @@ Plans:
   1. A newly installed merchant who has not accepted a billing charge is redirected to the Shopify subscription approval page before seeing any dashboard data
   2. A merchant who has an active $29/month subscription sees the full dashboard without interruption
   3. When a subscription is cancelled or expires, the merchant loses access to the dashboard and is shown the subscription prompt again
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Test scaffold + schema: billing.test.js (8 RED stubs) + ShopSession billingStatus/subscriptionId fields
+- [ ] 04-02-PLAN.md — Billing module: routes/billing.js helpers + app_subscriptions/update webhook handler
+- [ ] 04-03-PLAN.md — Integration wiring: auth.js, server.js, verifySessionToken.js + human verification
 
 ## Progress
 
@@ -96,4 +101,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Data Foundation | 4/4 | Complete   | 2026-03-11 |
 | 2. Sync and Profit Engine | 5/6 | In Progress|  |
 | 3. Profit Dashboard | 5/5 | Complete   | 2026-03-14 |
-| 4. Billing | 0/TBD | Not started | - |
+| 4. Billing | 0/3 | Not started | - |

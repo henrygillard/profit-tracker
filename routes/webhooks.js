@@ -5,6 +5,7 @@ const { prisma } = require('../lib/prisma');
 const { timingSafeEqual } = require('../lib/utils');
 const { upsertOrder, parseOrderFromShopify } = require('../lib/syncOrders');
 const { calculateOrderProfit } = require('../lib/profitEngine');
+const { checkBillingStatus } = require('./billing');
 
 // In-memory deduplication for Shopify webhook retries (MVP: covers 15-min retry window)
 const processedWebhooks = new Set();
@@ -317,6 +318,43 @@ router.post('/bulk/finish', async (req, res) => {
       console.log(`bulk/finish: completed for ${config.shop}`);
     } catch (err) {
       console.error('bulk/finish processing error:', err.message);
+    }
+  });
+});
+
+/**
+ * POST /webhooks/app_subscriptions/update — Billing status change (BILL-01)
+ * Fires on subscription cancellation, expiry, or freeze.
+ * NOTE: Payload may be empty ({}) since Shopify API 2024-07 — always read shop
+ * from x-shopify-shop-domain header and query live status via GraphQL.
+ * Registered programmatically (NOT via TOML — known Shopify CLI delivery bug).
+ */
+router.post('/app_subscriptions/update', async (req, res) => {
+  const hmac = req.headers['x-shopify-hmac-sha256'];
+  if (!verifyWebhookHmac(req.body, hmac)) return res.status(401).send('Unauthorized');
+
+  res.status(200).send('OK'); // Respond immediately — webhook must 200 within 5s
+
+  setImmediate(async () => {
+    try {
+      // Payload may be empty since API 2024-07 — use header for shop, not body
+      const shop = req.headers['x-shopify-shop-domain'];
+      if (!shop) return;
+
+      const session = await prisma.shopSession.findFirst({ where: { shop } });
+      if (!session) return;
+
+      // Live query — don't trust empty payload
+      const isActive = await checkBillingStatus(shop, session.accessToken);
+
+      await prisma.shopSession.update({
+        where: { shop },
+        data: { billingStatus: isActive ? 'ACTIVE' : 'INACTIVE' },
+      });
+
+      console.log(`app_subscriptions/update: ${shop} billingStatus → ${isActive ? 'ACTIVE' : 'INACTIVE'}`);
+    } catch (err) {
+      console.error('app_subscriptions/update error:', err.message);
     }
   });
 });

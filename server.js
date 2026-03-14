@@ -86,8 +86,11 @@ app.get('/admin', async (req, res) => {
     const billing = await createBillingSubscription(shop, session.accessToken);
     if (billing.confirmationUrl) {
       const url = billing.confirmationUrl;
+      const apiKey = process.env.SHOPIFY_API_KEY;
       return res.send(`<!DOCTYPE html><html><head>
-        <script>window.top.location.href = ${JSON.stringify(url)};</script>
+        <meta name="shopify-api-key" content="${apiKey}" />
+        <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+        <script>window.addEventListener('load', function() { shopify.navigate(${JSON.stringify(url)}); });</script>
       </head><body>Redirecting to billing...</body></html>`);
     }
     // Billing error fallthrough — serve app (don't block merchant indefinitely)

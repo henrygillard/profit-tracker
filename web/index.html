@@ -3,16 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="shopify-api-key" content="your_api_key_here" />
+  <meta name="shopify-api-key" content="%VITE_SHOPIFY_API_KEY%" />
   <!-- App Bridge MUST be first script — sets window.shopify global -->
   <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
   <!-- Polaris web components — loads s-* custom elements -->
   <script src="https://cdn.shopify.com/shopifycloud/polaris.js"></script>
   <title>Profit Tracker</title>
-  <script type="module" crossorigin src="/app/assets/index-e94a0e77.js"></script>
 </head>
 <body>
   <div id="root"></div>
-  
+  <script type="module" src="/src/main.jsx"></script>
 </body>
 </html>

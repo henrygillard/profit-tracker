@@ -14,8 +14,10 @@ model ShopSession {
   scope       String
   isOnline    Boolean   @default(false) @map("is_online")
   expiresAt   DateTime? @map("expires_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  billingStatus  String?   @map("billing_status")    // 'ACTIVE' | 'INACTIVE' | null
+  subscriptionId String?   @map("subscription_id")   // GID e.g. gid://shopify/AppSubscription/123
 
   @@index([shop])
   @@map("shop_sessions")

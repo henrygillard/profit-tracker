@@ -170,10 +170,12 @@ export default function Overview({ dateRange, onDateChange }) {
           </s-section>
 
           <s-section heading="COGS">
-            <s-text variant="heading-md">
-              {formatCurrency(data.cogsTotal)}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <s-text variant="heading-md">
+                {formatCurrency(data.cogsTotal)}
+              </s-text>
               <InfoTooltip lines={COGS_TOOLTIP} />
-            </s-text>
+            </div>
             {data.isPartial && (
               <s-text variant="body-sm">
                 Partial ({data.missingCogsCount} orders excluded)

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 04-billing 04-02-PLAN.md
-last_updated: "2026-03-14T16:20:56.674Z"
+stopped_at: Completed 04-billing 04-03-PLAN.md
+last_updated: "2026-03-14T20:25:20.758Z"
 last_activity: 2026-03-10 — Roadmap created, phases derived from requirements
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 19
-  completed_plans: 18
+  completed_plans: 19
   percent: 25
 ---
 
@@ -68,6 +68,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 03-profit-dashboard P05 | 5 | 2 tasks | 1 files |
 | Phase 04-billing P01 | 9 | 2 tasks | 3 files |
 | Phase 04-billing P02 | 442 | 2 tasks | 5 files |
+| Phase 04-billing P03 | 15 | 1 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -118,6 +119,9 @@ Recent decisions affecting current work:
 - [Phase 04-billing]: billingStatus and subscriptionId added as nullable String? to ShopSession — values ACTIVE | INACTIVE | null
 - [Phase 04-billing]: billingWebhookRouter exported from routes/billing.js for test contract compatibility — webhooks.js imports checkBillingStatus and duplicates handler inline for production routing
 - [Phase 04-billing]: routes/billing mock uses jest.requireActual for billingWebhookRouter — preserves real HMAC logic in tests while making createBillingSubscription/checkBillingStatus jest.fn() mockable
+- [Phase 04-billing]: OAuth callback redirects to billing confirmationUrl on success; falls through to /admin on error — never blocks merchant on billing failure
+- [Phase 04-billing]: /admin uses Pattern 5 live verification (checkBillingStatus before createBillingSubscription) to handle race conditions post-approval
+- [Phase 04-billing]: verifySessionToken made async with prisma billing guard returning 402 for inactive subscriptions; ./prisma sibling path added to jest.config.js moduleNameMapper
 
 ### Pending Todos
 
@@ -132,6 +136,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-14T16:20:56.668Z
-Stopped at: Completed 04-billing 04-02-PLAN.md
+Last session: 2026-03-14T20:25:20.752Z
+Stopped at: Completed 04-billing 04-03-PLAN.md
 Resume file: None

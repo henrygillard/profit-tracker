@@ -11,9 +11,16 @@ function InfoTooltip({ lines }) {
       const rect = iconRef.current.getBoundingClientRect();
       const tooltipWidth = 260;
       const margin = 8;
+      const estimatedTooltipHeight = lines.length * 50;
       let left = rect.left + rect.width / 2 - tooltipWidth / 2;
       left = Math.max(margin, Math.min(left, window.innerWidth - tooltipWidth - margin));
-      setPos({ top: rect.top - margin, left });
+      const spaceAbove = rect.top - margin;
+      const flipBelow = spaceAbove < estimatedTooltipHeight + 60;
+      if (flipBelow) {
+        setPos({ top: rect.bottom + margin, left, below: true });
+      } else {
+        setPos({ top: rect.top - margin, left, below: false });
+      }
     }
   }
 
@@ -27,7 +34,7 @@ function InfoTooltip({ lines }) {
       {pos && (
         <div
           className="pt-info-popup"
-          style={{ top: pos.top, left: pos.left, transform: 'translateY(-100%)' }}
+          style={{ top: pos.top, left: pos.left, transform: pos.below ? 'none' : 'translateY(-100%)' }}
         >
           {lines.map((line, i) => <p key={i}>{line}</p>)}
         </div>

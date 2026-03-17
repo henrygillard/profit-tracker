@@ -4,6 +4,7 @@ import CogsCoverage from './components/CogsCoverage.jsx';
 import TrendChart from './components/TrendChart.jsx';
 import OrdersTable from './components/OrdersTable.jsx';
 import ProductsTable from './components/ProductsTable.jsx';
+import HelpWizard from './components/HelpWizard.jsx';
 
 function getDefaultDateRange() {
   const to = new Date();
@@ -30,6 +31,7 @@ export default function App() {
   const [dateRange, setDateRange] = useState(getDefaultDateRange);
   const [view, setView] = useState(getCurrentView);
   const [error, setError] = useState(null);
+  const [showHelp, setShowHelp] = useState(false);
 
   // Listen for browser navigation (back/forward)
   React.useEffect(() => {
@@ -74,7 +76,7 @@ export default function App() {
         </s-banner>
       )}
       <s-section>
-        <nav style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+        <nav style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', alignItems: 'center' }}>
           <button
             onClick={() => handleNav('overview')}
             aria-current={view === 'overview' ? 'page' : undefined}
@@ -93,9 +95,33 @@ export default function App() {
           >
             Products
           </button>
+          <button
+            onClick={() => setShowHelp(true)}
+            aria-label="Help & guide"
+            title="How it works"
+            style={{
+              marginLeft: 'auto',
+              width: 28,
+              height: 28,
+              borderRadius: '50%',
+              border: '1.5px solid #c9cccf',
+              background: '#fff',
+              color: '#6d7175',
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            ?
+          </button>
         </nav>
         <div>{renderView()}</div>
       </s-section>
+      {showHelp && <HelpWizard onClose={() => setShowHelp(false)} />}
     </s-page>
   );
 }

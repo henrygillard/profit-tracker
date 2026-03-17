@@ -106,7 +106,10 @@
       "Skill(gsd:complete-milestone)",
       "Bash(find /Users/henry/code/profit-tracker -type f -name \"prisma.schema\" -o -name \"schema.prisma\" -o -name \"*.sql\" 2>/dev/null | head -20)",
       "Bash(grep -A 30 \"calculateOrderProfit\" /Users/henry/code/profit-tracker/tests/*.test.js 2>/dev/null | head -80)",
-      "Bash(node scripts/seed-demo.js)"
+      "Bash(node scripts/seed-demo.js)",
+      "Bash(find /Users/henry/code/profit-tracker -name \"*.toml\" -o -name \"railway.json\" -o -name \".railway\" 2>/dev/null | head -20)",
+      "Bash(grep -r \"idToken\\\\|shopify-api-key\\\\|VITE_SHOPIFY\\\\|App Bridge\\\\|app-bridge\" /Users/henry/code/promo-galore --include=\"*.js\" --include=\"*.jsx\" --include=\"*.html\" -l 2>/dev/null | grep -v node_modules)",
+      "Bash(grep -r \"idToken\\\\|shopify-api-key\\\\|VITE_SHOPIFY\\\\|app-bridge\" /Users/henry/code/promo-galore --include=\"*.js\" --include=\"*.jsx\" --include=\"*.html\" -n 2>/dev/null | grep -v node_modules | head -20)"
     ]
   }
 }

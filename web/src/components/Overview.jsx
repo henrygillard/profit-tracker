@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { apiFetch } from "../api.js";
 import CogsCoverage from "./CogsCoverage.jsx";
 
@@ -36,7 +37,7 @@ function InfoTooltip({ lines }) {
       <span ref={iconRef} className="pt-info-icon" aria-label="More info">
         i
       </span>
-      {pos && (
+      {pos && createPortal(
         <div
           className="pt-info-popup"
           style={{
@@ -49,7 +50,8 @@ function InfoTooltip({ lines }) {
           {lines.map((line, i) => (
             <p key={i}>{line}</p>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </span>
   );

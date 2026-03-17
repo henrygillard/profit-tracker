@@ -22,7 +22,9 @@ const prisma = new PrismaClient();
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
-const SHOP = 'henry-test-2.myshopify.com';
+const SHOP = process.argv[2] || 'henry-test-2.myshopify.com';
+// Derive a shop-specific numeric offset from the shop name to avoid ID collisions
+const SHOP_NUM = parseInt(SHOP.match(/\d+/)?.[0] || '0', 10);
 const PLAN = 'Grow';
 const THIRD_PARTY_FEE_RATE = 0.01;    // Grow plan third-party gateway fee
 const SP_RATE  = 0.025;               // Shopify Payments Grow: 2.5% + $0.30
@@ -265,8 +267,8 @@ async function main() {
   const lineItemRows   = [];
   const orderProfitRows = [];
 
-  let orderSeq    = 100000;   // numeric suffix for order GIDs
-  let lineItemSeq = 5000000;  // numeric suffix for line item GIDs
+  let orderSeq    = 100000 + SHOP_NUM * 1000000;   // numeric suffix for order GIDs
+  let lineItemSeq = 5000000 + SHOP_NUM * 10000000; // numeric suffix for line item GIDs
   let orderNum    = 1001;     // display order name (#1001, #1002, ...)
 
   for (let day = 0; day < TOTAL_DAYS; day++) {
@@ -321,12 +323,13 @@ async function main() {
 
       // Build line items
       const items = chosenVariants.map(v => ({
-        variantId: v.id,
-        sku:       v.sku,
-        quantity:  rng() < 0.88 ? 1 : 2,
-        unitPrice: v.price,
-        cost:      v.cost,
-        hasCogs:   v.hasCogs,
+        variantId:   v.id,
+        sku:         v.sku,
+        productName: v.productName,
+        quantity:    rng() < 0.88 ? 1 : 2,
+        unitPrice:   v.price,
+        cost:        v.cost,
+        hasCogs:     v.hasCogs,
       }));
 
       const itemsSubtotal = items.reduce((s, li) => s + li.quantity * li.unitPrice, 0);

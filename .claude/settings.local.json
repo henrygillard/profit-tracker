@@ -112,7 +112,10 @@
       "Bash(grep -r \"idToken\\\\|shopify-api-key\\\\|VITE_SHOPIFY\\\\|app-bridge\" /Users/henry/code/promo-galore --include=\"*.js\" --include=\"*.jsx\" --include=\"*.html\" -n 2>/dev/null | grep -v node_modules | head -20)",
       "Bash(npm run:*)",
       "Bash(npx prisma:*)",
-      "Bash(cat /Users/henry/code/profit-tracker/prisma/migrations/20260316_add_product_name_to_line_items/*.sql)"
+      "Bash(cat /Users/henry/code/profit-tracker/prisma/migrations/20260316_add_product_name_to_line_items/*.sql)",
+      "Bash(find /Users/henry/code/profit-tracker -type f -name *bill* -o -name *subscr* -o -name *charge* -o -name *auth*)",
+      "Bash(grep -r \"BILLING_TEST_MODE\\\\|myshopify\\\\|402\\\\|billing\" /Users/henry/code/profit-tracker/.env*)",
+      "Bash(node:*)"
     ]
   }
 }

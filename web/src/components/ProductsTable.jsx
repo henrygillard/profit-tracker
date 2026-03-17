@@ -66,13 +66,18 @@ export default function ProductsTable({ dateRange }) {
                 return (
                   <tr key={id || product.sku}>
                     <td>
-                      <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <span style={{ fontWeight: 500 }}>{product.sku || product.variantId || '—'}</span>
-                        {isTop    && <span className="pt-badge pt-badge-success">Top 3</span>}
-                        {isBottom && <span className="pt-badge pt-badge-danger">Bottom 3</span>}
-                        {!product.allCogsKnown && (
-                          <span className="pt-badge pt-badge-warning">Partial COGS</span>
+                      <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {product.productName && (
+                          <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{product.productName}</span>
                         )}
+                        <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <span style={{ fontWeight: 500 }}>{product.sku || product.variantId || '—'}</span>
+                          {isTop    && <span className="pt-badge pt-badge-success">Top 3</span>}
+                          {isBottom && <span className="pt-badge pt-badge-danger">Bottom 3</span>}
+                          {!product.allCogsKnown && (
+                            <span className="pt-badge pt-badge-warning">Partial COGS</span>
+                          )}
+                        </span>
                       </span>
                     </td>
                     <td className="pt-col-num" style={{ color: 'var(--text-2)' }}>{product.orderCount}</td>

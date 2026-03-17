@@ -57,10 +57,11 @@ model Order {
 model LineItem {
   id        String   @id              // Shopify GID
   orderId   String   @map("order_id")
-  variantId String?  @map("variant_id") // nullable: custom line items have no variant
-  sku       String?
-  quantity  Int
-  unitPrice Decimal  @map("unit_price") @db.Decimal(12, 2)
+  variantId   String?  @map("variant_id") // nullable: custom line items have no variant
+  sku         String?
+  productName String?  @map("product_name")
+  quantity    Int
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(12, 2)
 
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 

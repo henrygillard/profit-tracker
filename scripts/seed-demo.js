@@ -384,12 +384,13 @@ async function main() {
       for (const li of items) {
         lineItemSeq++;
         lineItemRows.push({
-          id:        `gid://shopify/LineItem/${lineItemSeq}`,
-          orderId:   orderId,
-          variantId: li.variantId,
-          sku:       li.sku,
-          quantity:  li.quantity,
-          unitPrice: new Prisma.Decimal(li.unitPrice),
+          id:          `gid://shopify/LineItem/${lineItemSeq}`,
+          orderId:     orderId,
+          variantId:   li.variantId,
+          sku:         li.sku,
+          productName: li.productName || null,
+          quantity:    li.quantity,
+          unitPrice:   new Prisma.Decimal(li.unitPrice),
         });
       }
 

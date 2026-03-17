@@ -264,6 +264,7 @@ router.get('/dashboard/products', async (req, res) => {
     SELECT
       li.variant_id,
       li.sku,
+      MAX(li.product_name) AS product_name,
       COUNT(DISTINCT li.order_id) AS order_count,
       SUM(li.unit_price * li.quantity) AS revenue,
       SUM(op.net_profit * (li.unit_price * li.quantity) / NULLIF(op.revenue_net, 0)) AS net_profit_attr,
@@ -282,6 +283,7 @@ router.get('/dashboard/products', async (req, res) => {
     // Support both snake_case (real Postgres) and camelCase (test mocks)
     const variantId = r.variant_id ?? r.variantId ?? null;
     const sku = r.sku ?? null;
+    const productName = r.product_name ?? r.productName ?? null;
     const orderCount = Number(r.order_count ?? r.orderCount ?? 0);
     const revenue = Number(r.revenue ?? 0);
     const rawNetProfit = r.net_profit_attr ?? r.netProfitAttributed ?? null;
@@ -295,6 +297,7 @@ router.get('/dashboard/products', async (req, res) => {
     return {
       variantId,
       sku,
+      productName,
       orderCount,
       revenue,
       netProfitAttributed,

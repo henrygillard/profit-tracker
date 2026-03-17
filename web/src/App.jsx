@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Overview from './components/Overview.jsx';
 import TrendChart from './components/TrendChart.jsx';
 import OrdersTable from './components/OrdersTable.jsx';
 import ProductsTable from './components/ProductsTable.jsx';
 import HelpWizard from './components/HelpWizard.jsx';
+import { apiFetch } from './api.js';
 
 function getDefaultDateRange() {
   const to = new Date();
@@ -57,18 +58,23 @@ export default function App() {
   const [dateRange, setDateRange] = useState(getDefaultDateRange);
   const [view, setView] = useState(getCurrentView);
   const [showHelp, setShowHelp] = useState(false);
+  const [shopDomain, setShopDomain] = useState(null);
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('pt-theme') || 'dark';
     document.documentElement.setAttribute('data-theme', saved);
     return saved;
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
+    apiFetch('/api/health').then(data => setShopDomain(data.shop)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('pt-theme', theme);
   }, [theme]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     function onPopState() { setView(getCurrentView()); }
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
@@ -81,8 +87,8 @@ export default function App() {
 
   function renderView() {
     switch (view) {
-      case 'orders':   return <OrdersTable dateRange={dateRange} />;
-      case 'products': return <ProductsTable dateRange={dateRange} />;
+      case 'orders':   return <OrdersTable dateRange={dateRange} shopDomain={shopDomain} />;
+      case 'products': return <ProductsTable dateRange={dateRange} shopDomain={shopDomain} />;
       default:
         return (
           <>

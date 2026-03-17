@@ -17,7 +17,13 @@ function formatCurrency(value) {
   return Number(value).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 }
 
-export default function OrdersTable({ dateRange }) {
+function gidToNumericId(gid) {
+  if (!gid) return null;
+  const parts = gid.split('/');
+  return parts[parts.length - 1];
+}
+
+export default function OrdersTable({ dateRange, shopDomain }) {
   const [allOrders, setAllOrders] = useState([]);
   const [sortKey, setSortKey] = useState('processedAt');
   const [sortDir, setSortDir] = useState('desc');
@@ -98,6 +104,11 @@ export default function OrdersTable({ dateRange }) {
                   ? (order.netProfit >= 0 ? 'var(--c-profit)' : 'var(--danger)')
                   : undefined;
 
+                const numericId = gidToNumericId(order.orderId);
+                const adminUrl = shopDomain && numericId
+                  ? `https://${shopDomain}/admin/orders/${numericId}`
+                  : null;
+
                 return (
                   <tr key={order.orderId}>
                     <td style={{ color: 'var(--text-2)', fontSize: 12 }}>
@@ -105,7 +116,11 @@ export default function OrdersTable({ dateRange }) {
                         ? new Date(order.processedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                         : '—'}
                     </td>
-                    <td style={{ fontWeight: 500 }}>{order.shopifyOrderName}</td>
+                    <td style={{ fontWeight: 500 }}>
+                      {adminUrl
+                        ? <a href={adminUrl} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }} onMouseEnter={e => e.currentTarget.style.textDecoration='underline'} onMouseLeave={e => e.currentTarget.style.textDecoration='none'}>{order.shopifyOrderName}</a>
+                        : order.shopifyOrderName}
+                    </td>
                     <td className="pt-col-num">{formatCurrency(order.revenueNet)}</td>
                     <td className="pt-col-num">
                       {order.cogsKnown

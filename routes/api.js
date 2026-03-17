@@ -263,6 +263,7 @@ router.get('/dashboard/products', async (req, res) => {
   const results = await prisma.$queryRaw`
     SELECT
       li.variant_id,
+      MAX(li.product_id) AS product_id,
       li.sku,
       MAX(li.product_name) AS product_name,
       COUNT(DISTINCT li.order_id) AS order_count,
@@ -282,6 +283,7 @@ router.get('/dashboard/products', async (req, res) => {
   return res.json(results.map(r => {
     // Support both snake_case (real Postgres) and camelCase (test mocks)
     const variantId = r.variant_id ?? r.variantId ?? null;
+    const productId = r.product_id ?? r.productId ?? null;
     const sku = r.sku ?? null;
     const productName = r.product_name ?? r.productName ?? null;
     const orderCount = Number(r.order_count ?? r.orderCount ?? 0);
@@ -296,6 +298,7 @@ router.get('/dashboard/products', async (req, res) => {
 
     return {
       variantId,
+      productId,
       sku,
       productName,
       orderCount,

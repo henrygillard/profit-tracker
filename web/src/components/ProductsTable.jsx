@@ -5,7 +5,13 @@ function formatCurrency(value) {
   return Number(value).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 }
 
-export default function ProductsTable({ dateRange }) {
+function gidToNumericId(gid) {
+  if (!gid) return null;
+  const parts = gid.split('/');
+  return parts[parts.length - 1];
+}
+
+export default function ProductsTable({ dateRange, shopDomain }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -63,12 +69,21 @@ export default function ProductsTable({ dateRange }) {
                   ? (product.netProfitAttributed >= 0 ? 'var(--c-profit)' : 'var(--danger)')
                   : undefined;
 
+                const numericProductId = gidToNumericId(product.productId);
+                const adminUrl = shopDomain && numericProductId
+                  ? `https://${shopDomain}/admin/products/${numericProductId}`
+                  : null;
+
                 return (
                   <tr key={id || product.sku}>
                     <td>
                       <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          <span style={{ fontWeight: 500 }}>{product.productName || product.sku || product.variantId || '—'}</span>
+                          <span style={{ fontWeight: 500 }}>
+                            {adminUrl
+                              ? <a href={adminUrl} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }} onMouseEnter={e => e.currentTarget.style.textDecoration='underline'} onMouseLeave={e => e.currentTarget.style.textDecoration='none'}>{product.productName || product.sku || product.variantId || '—'}</a>
+                              : (product.productName || product.sku || product.variantId || '—')}
+                          </span>
                           {isTop    && <span className="pt-badge pt-badge-success">Top 3</span>}
                           {isBottom && <span className="pt-badge pt-badge-danger">Bottom 3</span>}
                           {!product.allCogsKnown && (

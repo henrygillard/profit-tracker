@@ -58,6 +58,7 @@ model LineItem {
   id        String   @id              // Shopify GID
   orderId   String   @map("order_id")
   variantId   String?  @map("variant_id") // nullable: custom line items have no variant
+  productId   String?  @map("product_id") // nullable: Shopify GID for the parent product
   sku         String?
   productName String?  @map("product_name")
   quantity    Int

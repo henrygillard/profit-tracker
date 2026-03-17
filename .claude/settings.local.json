@@ -111,7 +111,8 @@
       "Bash(grep -r \"idToken\\\\|shopify-api-key\\\\|VITE_SHOPIFY\\\\|App Bridge\\\\|app-bridge\" /Users/henry/code/promo-galore --include=\"*.js\" --include=\"*.jsx\" --include=\"*.html\" -l 2>/dev/null | grep -v node_modules)",
       "Bash(grep -r \"idToken\\\\|shopify-api-key\\\\|VITE_SHOPIFY\\\\|app-bridge\" /Users/henry/code/promo-galore --include=\"*.js\" --include=\"*.jsx\" --include=\"*.html\" -n 2>/dev/null | grep -v node_modules | head -20)",
       "Bash(npm run:*)",
-      "Bash(npx prisma:*)"
+      "Bash(npx prisma:*)",
+      "Bash(cat /Users/henry/code/profit-tracker/prisma/migrations/20260316_add_product_name_to_line_items/*.sql)"
     ]
   }
 }

@@ -44,7 +44,7 @@ export default function ProductsTable({ dateRange }) {
           <table className="pt-table">
             <thead>
               <tr>
-                <th>SKU / Variant</th>
+                <th>Product / SKU</th>
                 <th className="pt-col-num">Orders</th>
                 <th className="pt-col-num">Revenue</th>
                 <th className="pt-col-num">Net Profit</th>
@@ -67,17 +67,17 @@ export default function ProductsTable({ dateRange }) {
                   <tr key={id || product.sku}>
                     <td>
                       <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        {product.productName && (
-                          <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{product.productName}</span>
-                        )}
                         <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          <span style={{ fontWeight: 500 }}>{product.sku || product.variantId || '—'}</span>
+                          <span style={{ fontWeight: 500 }}>{product.productName || product.sku || product.variantId || '—'}</span>
                           {isTop    && <span className="pt-badge pt-badge-success">Top 3</span>}
                           {isBottom && <span className="pt-badge pt-badge-danger">Bottom 3</span>}
                           {!product.allCogsKnown && (
                             <span className="pt-badge pt-badge-warning">Partial COGS</span>
                           )}
                         </span>
+                        {product.productName && (
+                          <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{product.sku || product.variantId}</span>
+                        )}
                       </span>
                     </td>
                     <td className="pt-col-num" style={{ color: 'var(--text-2)' }}>{product.orderCount}</td>

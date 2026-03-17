@@ -549,7 +549,7 @@ button { font-family: var(--font); }
 
 .pt-info-popup {
   position: fixed;
-  background: var(--elevated);
+  background: #1e2a3a;
   border: 1px solid var(--border-md);
   color: var(--text);
   padding: 10px 14px;
@@ -560,7 +560,7 @@ button { font-family: var(--font); }
   width: 260px;
   z-index: 9999;
   pointer-events: none;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.8);
 }
 
 .pt-info-popup p { margin-top: 0.4em; }

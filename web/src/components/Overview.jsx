@@ -3,14 +3,29 @@ import { apiFetch } from "../api.js";
 import CogsCoverage from "./CogsCoverage.jsx";
 
 function InfoTooltip({ lines }) {
-  const [visible, setVisible] = React.useState(false);
+  const [pos, setPos] = React.useState(null);
+  const iconRef = React.useRef(null);
+
+  function handleMouseEnter() {
+    if (iconRef.current) {
+      const rect = iconRef.current.getBoundingClientRect();
+      const tooltipWidth = 260;
+      const margin = 8;
+      let left = rect.left + rect.width / 2 - tooltipWidth / 2;
+      // clamp so tooltip stays within the viewport
+      left = Math.max(margin, Math.min(left, window.innerWidth - tooltipWidth - margin));
+      setPos({ top: rect.top - margin, left });
+    }
+  }
+
   return (
     <span
-      style={{ position: "relative", display: "inline-block", marginLeft: "0.4rem", verticalAlign: "middle" }}
-      onMouseEnter={() => setVisible(true)}
-      onMouseLeave={() => setVisible(false)}
+      style={{ display: "inline-block", marginLeft: "0.4rem", verticalAlign: "middle" }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setPos(null)}
     >
       <span
+        ref={iconRef}
         aria-label="More info"
         style={{
           display: "inline-flex",
@@ -29,13 +44,13 @@ function InfoTooltip({ lines }) {
       >
         i
       </span>
-      {visible && (
+      {pos && (
         <div
           style={{
-            position: "absolute",
-            bottom: "calc(100% + 8px)",
-            left: "50%",
-            transform: "translateX(-50%)",
+            position: "fixed",
+            top: pos.top,
+            left: pos.left,
+            transform: "translateY(-100%)",
             background: "#1a1a1a",
             color: "#fff",
             padding: "0.6rem 0.8rem",
@@ -43,7 +58,7 @@ function InfoTooltip({ lines }) {
             fontSize: 12,
             lineHeight: 1.6,
             width: 260,
-            zIndex: 100,
+            zIndex: 9999,
             pointerEvents: "none",
             boxShadow: "0 4px 12px rgba(0,0,0,0.35)",
           }}

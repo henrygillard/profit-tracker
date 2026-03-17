@@ -110,7 +110,8 @@
       "Bash(find /Users/henry/code/profit-tracker -name \"*.toml\" -o -name \"railway.json\" -o -name \".railway\" 2>/dev/null | head -20)",
       "Bash(grep -r \"idToken\\\\|shopify-api-key\\\\|VITE_SHOPIFY\\\\|App Bridge\\\\|app-bridge\" /Users/henry/code/promo-galore --include=\"*.js\" --include=\"*.jsx\" --include=\"*.html\" -l 2>/dev/null | grep -v node_modules)",
       "Bash(grep -r \"idToken\\\\|shopify-api-key\\\\|VITE_SHOPIFY\\\\|app-bridge\" /Users/henry/code/promo-galore --include=\"*.js\" --include=\"*.jsx\" --include=\"*.html\" -n 2>/dev/null | grep -v node_modules | head -20)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(npx prisma:*)"
     ]
   }
 }

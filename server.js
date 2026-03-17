@@ -19,6 +19,17 @@ const { createBillingSubscription, checkBillingStatus } = require('./routes/bill
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const fs = require('fs');
+
+const appHtmlPath = path.join(__dirname, 'public', 'app', 'index.html');
+function sendAppHtml(res) {
+  const html = fs.readFileSync(appHtmlPath, 'utf8').replace(
+    '__SHOPIFY_API_KEY__',
+    process.env.SHOPIFY_API_KEY
+  );
+  res.setHeader('Content-Type', 'text/html');
+  res.send(html);
+}
 
 // Trust proxy for Railway
 app.set('trust proxy', 1);
@@ -81,7 +92,7 @@ app.get('/admin', async (req, res) => {
     const isActive = await checkBillingStatus(shop, session.accessToken);
     if (isActive) {
       await prisma.shopSession.update({ where: { shop }, data: { billingStatus: 'ACTIVE' } });
-      return res.sendFile(path.join(__dirname, 'public', 'app', 'index.html'));
+      return sendAppHtml(res);
     }
     const billing = await createBillingSubscription(shop, session.accessToken);
     if (billing.confirmationUrl) {
@@ -107,10 +118,10 @@ app.get('/admin', async (req, res) => {
       </body></html>`);
     }
     // Billing error fallthrough — serve app (don't block merchant indefinitely)
-    return res.sendFile(path.join(__dirname, 'public', 'app', 'index.html'));
+    return sendAppHtml(res);
   }
 
-  res.sendFile(path.join(__dirname, 'public', 'app', 'index.html'));
+  sendAppHtml(res);
 });
 
 // Root redirect: if shop param present, go to /admin; else show install prompt

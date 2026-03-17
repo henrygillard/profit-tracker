@@ -4,13 +4,13 @@ import { apiFetch } from '../api.js';
 const PAGE_SIZE = 50;
 
 const COLUMNS = [
-  { key: 'processedAt', label: 'Date' },
-  { key: 'shopifyOrderName', label: 'Order', sortable: false },
-  { key: 'revenueNet', label: 'Revenue', numeric: true },
-  { key: 'cogsTotal', label: 'COGS', numeric: true },
-  { key: 'feesTotal', label: 'Fees', numeric: true },
-  { key: 'netProfit', label: 'Net Profit', numeric: true },
-  { key: 'marginPct', label: 'Margin %', numeric: true, sortable: false },
+  { key: 'processedAt',      label: 'Date',      numeric: false },
+  { key: 'shopifyOrderName', label: 'Order',     numeric: false, sortable: false },
+  { key: 'revenueNet',       label: 'Revenue',   numeric: true  },
+  { key: 'cogsTotal',        label: 'COGS',      numeric: true  },
+  { key: 'feesTotal',        label: 'Fees',      numeric: true  },
+  { key: 'netProfit',        label: 'Net Profit',numeric: true  },
+  { key: 'marginPct',        label: 'Margin %',  numeric: true, sortable: false },
 ];
 
 function formatCurrency(value) {
@@ -18,115 +18,123 @@ function formatCurrency(value) {
 }
 
 export default function OrdersTable({ dateRange }) {
-  const [orders, setOrders] = useState([]);
+  const [allOrders, setAllOrders] = useState([]);
   const [sortKey, setSortKey] = useState('processedAt');
   const [sortDir, setSortDir] = useState('desc');
   const [page, setPage] = useState(0);
-  const [allOrders, setAllOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [hasMore, setHasMore] = useState(false);
 
   useEffect(() => {
-    if (!dateRange || !dateRange.from || !dateRange.to) return;
-
+    if (!dateRange?.from || !dateRange?.to) return;
     setLoading(true);
     setError(null);
-
     apiFetch(
       `/api/dashboard/orders?from=${encodeURIComponent(dateRange.from)}&to=${encodeURIComponent(dateRange.to)}&sort=${sortKey}&dir=${sortDir}&page=${page}`
     )
       .then((result) => {
-        if (page === 0) {
-          setAllOrders(result);
-        } else {
-          setAllOrders((prev) => [...prev, ...result]);
-        }
+        if (page === 0) setAllOrders(result);
+        else setAllOrders(prev => [...prev, ...result]);
         setHasMore(result.length === PAGE_SIZE);
         setLoading(false);
       })
-      .catch((err) => {
-        setError('Could not load orders. Reload to try again.');
-        setLoading(false);
-      });
-  }, [dateRange && dateRange.from, dateRange && dateRange.to, sortKey, sortDir, page]);
+      .catch(() => { setError('Could not load orders. Reload to try again.'); setLoading(false); });
+  }, [dateRange?.from, dateRange?.to, sortKey, sortDir, page]);
 
-  // Reset page when dateRange or sort changes (but not when page itself changes)
   useEffect(() => {
     setPage(0);
     setAllOrders([]);
-  }, [dateRange && dateRange.from, dateRange && dateRange.to, sortKey, sortDir]);
+  }, [dateRange?.from, dateRange?.to, sortKey, sortDir]);
 
   function handleSort(key) {
-    if (key === sortKey) {
-      setSortDir((prev) => (prev === 'desc' ? 'asc' : 'desc'));
-    } else {
-      setSortKey(key);
-      setSortDir('desc');
-    }
-  }
-
-  function loadMore() {
-    setPage((prev) => prev + 1);
+    if (key === sortKey) setSortDir(prev => prev === 'desc' ? 'asc' : 'desc');
+    else { setSortKey(key); setSortDir('desc'); }
   }
 
   return (
-    <s-section heading="Orders">
-      {loading && page === 0 && <p>Loading...</p>}
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+    <div className="pt-card">
+      <div className="pt-card-header">
+        <span className="pt-card-title">Orders</span>
+        {allOrders.length > 0 && (
+          <span style={{ fontSize: 12, color: 'var(--text-2)', fontFamily: 'var(--mono)' }}>
+            {allOrders.length}{hasMore ? '+' : ''} rows
+          </span>
+        )}
+      </div>
+
+      {loading && page === 0 && <div className="pt-loading">Loading orders…</div>}
+      {error && <div style={{ padding: '16px 20px' }}><div className="pt-error-msg">{error}</div></div>}
+
       {!error && (
-        <s-table>
-          <s-table-header-row>
-            {COLUMNS.map((col) => {
-              const isSortable = col.sortable !== false;
-              const isActive = sortKey === col.key;
-              return (
-                <s-table-header
-                  key={col.key}
-                  listSlot={col.key === 'shopifyOrderName' ? 'primary' : 'labeled'}
-                  format={col.numeric ? 'numeric' : undefined}
-                  onClick={isSortable ? () => handleSort(col.key) : undefined}
-                  style={isSortable ? { cursor: 'pointer', userSelect: 'none' } : undefined}
-                >
-                  {col.label}
-                  {isActive ? (sortDir === 'desc' ? ' \u2193' : ' \u2191') : ''}
-                </s-table-header>
-              );
-            })}
-          </s-table-header-row>
-          <s-table-body>
-            {allOrders.map((order) => (
-              <s-table-row key={order.orderId}>
-                <s-table-cell>
-                  {order.processedAt
-                    ? new Date(order.processedAt).toLocaleDateString('en-US')
-                    : '—'}
-                </s-table-cell>
-                <s-table-cell>{order.shopifyOrderName}</s-table-cell>
-                <s-table-cell>{formatCurrency(order.revenueNet)}</s-table-cell>
-                <s-table-cell>
-                  {order.cogsKnown
-                    ? formatCurrency(order.cogsTotal)
-                    : <s-badge tone="warning">Unknown</s-badge>}
-                </s-table-cell>
-                <s-table-cell>{formatCurrency(order.feesTotal)}</s-table-cell>
-                <s-table-cell>
-                  {order.netProfit !== null ? formatCurrency(order.netProfit) : '—'}
-                </s-table-cell>
-                <s-table-cell>
-                  {order.marginPct !== null ? `${Number(order.marginPct).toFixed(1)}%` : '—'}
-                </s-table-cell>
-              </s-table-row>
-            ))}
-          </s-table-body>
-        </s-table>
-      )}
-      {!loading && hasMore && (
-        <div style={{ marginTop: '1rem', textAlign: 'center' }}>
-          <button onClick={loadMore}>Load more</button>
+        <div className="pt-table-wrap">
+          <table className="pt-table">
+            <thead>
+              <tr>
+                {COLUMNS.map(col => {
+                  const sortable = col.sortable !== false;
+                  const isActive = sortKey === col.key;
+                  return (
+                    <th
+                      key={col.key}
+                      className={[
+                        col.numeric ? 'pt-col-num' : '',
+                        sortable ? 'pt-sortable' : '',
+                        isActive ? 'pt-sort-active' : '',
+                      ].filter(Boolean).join(' ')}
+                      onClick={sortable ? () => handleSort(col.key) : undefined}
+                    >
+                      {col.label}
+                      {isActive ? (sortDir === 'desc' ? ' ↓' : ' ↑') : ''}
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {allOrders.map(order => {
+                const margin = order.marginPct !== null ? Number(order.marginPct).toFixed(1) : null;
+                const profitColor = order.netProfit !== null
+                  ? (order.netProfit >= 0 ? 'var(--c-profit)' : 'var(--danger)')
+                  : undefined;
+
+                return (
+                  <tr key={order.orderId}>
+                    <td style={{ color: 'var(--text-2)', fontSize: 12 }}>
+                      {order.processedAt
+                        ? new Date(order.processedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                        : '—'}
+                    </td>
+                    <td style={{ fontWeight: 500 }}>{order.shopifyOrderName}</td>
+                    <td className="pt-col-num">{formatCurrency(order.revenueNet)}</td>
+                    <td className="pt-col-num">
+                      {order.cogsKnown
+                        ? formatCurrency(order.cogsTotal)
+                        : <span className="pt-badge pt-badge-warning">Unknown</span>}
+                    </td>
+                    <td className="pt-col-num">{formatCurrency(order.feesTotal)}</td>
+                    <td className="pt-col-num" style={{ color: profitColor, fontWeight: 600 }}>
+                      {order.netProfit !== null ? formatCurrency(order.netProfit) : '—'}
+                    </td>
+                    <td className="pt-col-num" style={{ color: 'var(--text-2)' }}>
+                      {margin !== null ? `${margin}%` : '—'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
-      {loading && page > 0 && <p>Loading more...</p>}
-    </s-section>
+
+      {!loading && hasMore && (
+        <div className="pt-load-more">
+          <button className="pt-load-more-btn" onClick={() => setPage(p => p + 1)}>Load more</button>
+        </div>
+      )}
+      {loading && page > 0 && (
+        <div className="pt-load-more" style={{ color: 'var(--text-2)', fontSize: 13 }}>Loading more…</div>
+      )}
+    </div>
   );
 }

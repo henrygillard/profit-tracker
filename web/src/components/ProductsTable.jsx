@@ -11,85 +11,90 @@ export default function ProductsTable({ dateRange }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!dateRange || !dateRange.from || !dateRange.to) return;
-
+    if (!dateRange?.from || !dateRange?.to) return;
     setLoading(true);
     setError(null);
-
     apiFetch(
       `/api/dashboard/products?from=${encodeURIComponent(dateRange.from)}&to=${encodeURIComponent(dateRange.to)}`
     )
-      .then((result) => {
-        setProducts(result);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError('Could not load products. Reload to try again.');
-        setLoading(false);
-      });
-  }, [dateRange && dateRange.from, dateRange && dateRange.to]);
+      .then((result) => { setProducts(result); setLoading(false); })
+      .catch(() => { setError('Could not load products. Reload to try again.'); setLoading(false); });
+  }, [dateRange?.from, dateRange?.to]);
 
-  // Determine top 3 and bottom 3 with known COGS
-  const knownCogsProducts = products.filter((p) => p.allCogsKnown);
-  const topSet = new Set(knownCogsProducts.slice(0, 3).map((p) => p.variantId ?? p.sku));
-  const bottomSet = new Set(
-    knownCogsProducts.slice(-3).map((p) => p.variantId ?? p.sku)
-  );
+  const knownCogsProducts = products.filter(p => p.allCogsKnown);
+  const topSet    = new Set(knownCogsProducts.slice(0, 3).map(p => p.variantId ?? p.sku));
+  const bottomSet = new Set(knownCogsProducts.slice(-3).map(p => p.variantId ?? p.sku));
 
   return (
-    <s-section heading="Products by Margin">
-      {loading && <p>Loading...</p>}
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      {!loading && !error && (
-        <s-table>
-          <s-table-header-row>
-            <s-table-header listSlot="primary">SKU / Variant</s-table-header>
-            <s-table-header listSlot="labeled" format="numeric">Orders</s-table-header>
-            <s-table-header listSlot="labeled" format="numeric">Revenue</s-table-header>
-            <s-table-header listSlot="labeled" format="numeric">Net Profit</s-table-header>
-            <s-table-header listSlot="labeled" format="numeric">Margin %</s-table-header>
-          </s-table-header-row>
-          <s-table-body>
-            {products.map((product) => {
-              const id = product.variantId ?? product.sku;
-              const isTop = topSet.has(id);
-              const isBottom = bottomSet.has(id) && !isTop; // don't double-badge if fewer than 6 rows
+    <div className="pt-card">
+      <div className="pt-card-header">
+        <span className="pt-card-title">Products by Margin</span>
+        {products.length > 0 && (
+          <span style={{ fontSize: 12, color: 'var(--text-2)', fontFamily: 'var(--mono)' }}>
+            {products.length} variants
+          </span>
+        )}
+      </div>
 
-              return (
-                <s-table-row key={id || product.sku}>
-                  <s-table-cell>
-                    <span style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      {product.sku || product.variantId || '—'}
-                      {isTop && <s-badge tone="success">Top 3</s-badge>}
-                      {isBottom && <s-badge tone="critical">Bottom 3</s-badge>}
-                    </span>
-                  </s-table-cell>
-                  <s-table-cell>{product.orderCount}</s-table-cell>
-                  <s-table-cell>{formatCurrency(product.revenue)}</s-table-cell>
-                  <s-table-cell>
-                    {product.allCogsKnown
-                      ? (product.netProfitAttributed !== null
-                          ? formatCurrency(product.netProfitAttributed)
-                          : '—')
-                      : (
-                        <span style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                          —<s-badge tone="warning">Partial COGS</s-badge>
-                        </span>
-                      )}
-                  </s-table-cell>
-                  <s-table-cell>
-                    {product.allCogsKnown
-                      ? (product.marginPct !== null
-                          ? `${Number(product.marginPct).toFixed(1)}%`
-                          : '—')
-                      : '—'}
-                  </s-table-cell>
-                </s-table-row>
-              );
-            })}
-          </s-table-body>
-        </s-table>
+      {loading && <div className="pt-loading">Loading products…</div>}
+      {error && <div style={{ padding: '16px 20px' }}><div className="pt-error-msg">{error}</div></div>}
+
+      {!loading && !error && (
+        <div className="pt-table-wrap">
+          <table className="pt-table">
+            <thead>
+              <tr>
+                <th>SKU / Variant</th>
+                <th className="pt-col-num">Orders</th>
+                <th className="pt-col-num">Revenue</th>
+                <th className="pt-col-num">Net Profit</th>
+                <th className="pt-col-num">Margin %</th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map(product => {
+                const id = product.variantId ?? product.sku;
+                const isTop    = topSet.has(id);
+                const isBottom = bottomSet.has(id) && !isTop;
+                const margin   = product.allCogsKnown && product.marginPct !== null
+                  ? Number(product.marginPct).toFixed(1)
+                  : null;
+                const profitColor = product.allCogsKnown && product.netProfitAttributed !== null
+                  ? (product.netProfitAttributed >= 0 ? 'var(--c-profit)' : 'var(--danger)')
+                  : undefined;
+
+                return (
+                  <tr key={id || product.sku}>
+                    <td>
+                      <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <span style={{ fontWeight: 500 }}>{product.sku || product.variantId || '—'}</span>
+                        {isTop    && <span className="pt-badge pt-badge-success">Top 3</span>}
+                        {isBottom && <span className="pt-badge pt-badge-danger">Bottom 3</span>}
+                        {!product.allCogsKnown && (
+                          <span className="pt-badge pt-badge-warning">Partial COGS</span>
+                        )}
+                      </span>
+                    </td>
+                    <td className="pt-col-num" style={{ color: 'var(--text-2)' }}>{product.orderCount}</td>
+                    <td className="pt-col-num">{formatCurrency(product.revenue)}</td>
+                    <td className="pt-col-num" style={{ color: profitColor, fontWeight: profitColor ? 600 : undefined }}>
+                      {product.allCogsKnown && product.netProfitAttributed !== null
+                        ? formatCurrency(product.netProfitAttributed)
+                        : '—'}
+                    </td>
+                    <td className="pt-col-num" style={{ color: 'var(--text-2)' }}>
+                      {margin !== null ? `${margin}%` : '—'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {products.length === 0 && (
+            <div className="pt-empty">No products found for this period</div>
+          )}
+        </div>
       )}
-    </s-section>
+    </div>
   );
 }

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import Overview from './components/Overview.jsx';
-import CogsCoverage from './components/CogsCoverage.jsx';
 import TrendChart from './components/TrendChart.jsx';
 import OrdersTable from './components/OrdersTable.jsx';
 import ProductsTable from './components/ProductsTable.jsx';
@@ -10,10 +9,7 @@ function getDefaultDateRange() {
   const to = new Date();
   const from = new Date();
   from.setDate(from.getDate() - 30);
-  return {
-    from: from.toISOString(),
-    to: to.toISOString(),
-  };
+  return { from: from.toISOString(), to: to.toISOString() };
 }
 
 function getCurrentView() {
@@ -27,17 +23,19 @@ function navigate(view) {
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
+const TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'orders',   label: 'Orders'   },
+  { id: 'products', label: 'Products' },
+];
+
 export default function App() {
   const [dateRange, setDateRange] = useState(getDefaultDateRange);
   const [view, setView] = useState(getCurrentView);
-  const [error, setError] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
 
-  // Listen for browser navigation (back/forward)
   React.useEffect(() => {
-    function onPopState() {
-      setView(getCurrentView());
-    }
+    function onPopState() { setView(getCurrentView()); }
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
@@ -47,80 +45,47 @@ export default function App() {
     setView(newView);
   }
 
-  function handleDateChange(newRange) {
-    setDateRange(newRange);
-  }
-
   function renderView() {
     switch (view) {
-      case 'orders':
-        return <OrdersTable dateRange={dateRange} />;
-      case 'products':
-        return <ProductsTable dateRange={dateRange} />;
-      case 'overview':
+      case 'orders':   return <OrdersTable dateRange={dateRange} />;
+      case 'products': return <ProductsTable dateRange={dateRange} />;
       default:
         return (
-          <div>
-            <Overview dateRange={dateRange} onDateChange={handleDateChange} />
+          <>
+            <Overview dateRange={dateRange} onDateChange={setDateRange} />
             <TrendChart dateRange={dateRange} />
-          </div>
+          </>
         );
     }
   }
 
   return (
     <s-page>
-      {error && (
-        <s-banner tone="critical">
-          <p>{error}</p>
-        </s-banner>
-      )}
-      <s-section>
-        <nav style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', alignItems: 'center' }}>
+      <div className="pt-app">
+        <nav className="pt-nav">
+          <div className="pt-nav-tabs">
+            {TABS.map(tab => (
+              <button
+                key={tab.id}
+                className={`pt-tab${view === tab.id ? ' active' : ''}`}
+                onClick={() => handleNav(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
           <button
-            onClick={() => handleNav('overview')}
-            aria-current={view === 'overview' ? 'page' : undefined}
-          >
-            Overview
-          </button>
-          <button
-            onClick={() => handleNav('orders')}
-            aria-current={view === 'orders' ? 'page' : undefined}
-          >
-            Orders
-          </button>
-          <button
-            onClick={() => handleNav('products')}
-            aria-current={view === 'products' ? 'page' : undefined}
-          >
-            Products
-          </button>
-          <button
+            className="pt-help-btn"
             onClick={() => setShowHelp(true)}
             aria-label="Help & guide"
-            title="How it works"
-            style={{
-              marginLeft: 'auto',
-              width: 28,
-              height: 28,
-              borderRadius: '50%',
-              border: '1.5px solid #c9cccf',
-              background: '#fff',
-              color: '#6d7175',
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
           >
             ?
           </button>
         </nav>
-        <div>{renderView()}</div>
-      </s-section>
+        <main className="pt-content">
+          {renderView()}
+        </main>
+      </div>
       {showHelp && <HelpWizard onClose={() => setShowHelp(false)} />}
     </s-page>
   );

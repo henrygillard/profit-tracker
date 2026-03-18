@@ -256,10 +256,10 @@ describe('payout fee attribution (SYNC-04)', () => {
     // Call syncPayouts
     await syncPayouts(mockPrisma, 'test-shop.myshopify.com', 'test-token');
 
-    // Assert: prisma.orderProfit.update called with correct fee for order 12345
+    // Assert: prisma.orderProfit.update called with correct fee and feeSource for order 12345
     expect(mockPrisma.orderProfit.update).toHaveBeenCalledWith({
       where: { orderId: 'gid://shopify/Order/12345' },
-      data: { feesTotal: 2.50 },
+      data: { feesTotal: 2.50, feeSource: 'verified' },
     });
 
     // Assert: called twice total (once per order)

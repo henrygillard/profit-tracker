@@ -254,7 +254,8 @@ router.post('/refunds/create', async (req, res) => {
       };
 
       const existingFee = order.profit ? parseFloat(order.profit.feesTotal) : 0;
-      await upsertOrder(prisma, shop, parsedForRecalc, existingFee, config?.shopifyPlan || null);
+      const existingFeeSource = order.profit?.feeSource || null;  // preserve verified status
+      await upsertOrder(prisma, shop, parsedForRecalc, existingFee, config?.shopifyPlan || null, existingFeeSource);
     } catch (err) {
       console.error('refunds/create processing error:', err.message);
     }

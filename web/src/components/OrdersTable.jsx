@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { apiFetch } from '../api.js';
 
 const PAGE_SIZE = 50;
@@ -23,20 +24,74 @@ function gidToNumericId(gid) {
   return parts[parts.length - 1];
 }
 
+function FeeCellTooltip({ anchorRef, text }) {
+  const [pos, setPos] = useState(null);
+  useEffect(() => {
+    if (!anchorRef.current) return;
+    const rect = anchorRef.current.getBoundingClientRect();
+    const tooltipWidth = 260;
+    const margin = 8;
+    let left = rect.left + rect.width / 2 - tooltipWidth / 2;
+    left = Math.max(margin, Math.min(left, window.innerWidth - tooltipWidth - margin));
+    const spaceAbove = rect.top - margin;
+    const flipBelow = spaceAbove < 80;
+    setPos({
+      top: flipBelow ? rect.bottom + margin : rect.top - margin,
+      left,
+      below: flipBelow,
+    });
+  }, [anchorRef]);
+
+  if (!pos) return null;
+  return createPortal(
+    <div
+      className="pt-info-popup"
+      style={{
+        top: pos.top,
+        left: pos.left,
+        transform: pos.below ? 'none' : 'translateY(-100%)',
+        zIndex: 9999,
+      }}
+    >
+      <p>{text}</p>
+    </div>,
+    document.body
+  );
+}
+
 function FeeCell({ feesTotal, feeSource }) {
+  const [hovered, setHovered] = useState(false);
+  const anchorRef = useRef(null);
+
   if (feeSource === 'pending') {
     return <span className="pt-badge pt-badge-info">Pending</span>;
   }
   if (feeSource === 'estimated') {
     return (
-      <span title="Rate-table estimate — not from settled payout">
+      <span
+        ref={anchorRef}
+        style={{ cursor: 'default' }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
         {formatCurrency(feesTotal)}
         <span className="pt-badge pt-badge-warning" style={{ marginLeft: 4 }}>Est.</span>
+        {hovered && <FeeCellTooltip anchorRef={anchorRef} text="Rate-table estimate — not from settled payout" />}
       </span>
     );
   }
   // verified — exact from settled payout, tooltip for transparency
-  return <span title="Exact fee from settled payout">{formatCurrency(feesTotal)}</span>;
+  return (
+    <span
+      ref={anchorRef}
+      style={{ cursor: 'default' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {formatCurrency(feesTotal)}
+      {hovered && <FeeCellTooltip anchorRef={anchorRef} text="Exact fee from settled payout" />}
+    </span>
+  );
 }
 
 export default function OrdersTable({ dateRange, shopDomain }) {

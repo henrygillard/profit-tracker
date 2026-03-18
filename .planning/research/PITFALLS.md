@@ -1,477 +1,360 @@
-# Domain Pitfalls: Shopify Profit Analytics App
+# Pitfalls Research
 
-**Domain:** Shopify embedded analytics app (profit margins, COGS, fees)
-**Researched:** 2026-03-10
-**Confidence:** HIGH for API rate limits and fee mechanics (well-documented); MEDIUM for review rejection patterns (community-sourced); HIGH for App Bridge/CSP (stable, documented behavior)
+**Domain:** Shopify Embedded Profit Analytics App — v2.0 Feature Addition
+**Researched:** 2026-03-18
+**Confidence:** HIGH (Shopify Payments API, Recharts patterns, OAuth iframe restrictions), MEDIUM (Meta/Google attribution models, token lifecycle), LOW for nothing — all claims below are verified or explicitly flagged
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, data corruption, or app rejection.
+### Pitfall 1: Shopify Payments REFUND Transactions Must Not Write Back Fees
+
+**What goes wrong:**
+The existing `syncPayouts.js` correctly filters `type === 'CHARGE'` transactions only. The risk for the FEE-FIX-01 verification task is that a developer, while debugging fee accuracy, adds processing for REFUND-type balance transactions to "offset" fees on refunded orders. REFUND-type rows have a `fee.amount` of `"0.00"` — the original fee credit appears as a separate CREDIT-type entry, not as a negative amount on the REFUND row. Writing REFUND rows back sets `feesTotal = 0` for matched orders, silently corrupting profit data.
+
+Additionally: balance transactions of type `SHOPIFY_COLLECTIVE_CREDIT`, `TAX_ADJUSTMENT_DEBIT`, and `TAX_ADJUSTMENT_CREDIT` return `null` for `associatedOrder`. These were confirmed as an API issue fixed in Shopify API version 2025-7. Apps using older API versions still see null here.
+
+**Why it happens:**
+The Shopify Help Center states "if you refund 50% of an order, you're credited with 50% of the transaction fee." Developers assume this credit appears on the REFUND balance transaction row. It does not. It appears as a separate CREDIT-type entry in a later payout cycle.
+
+**How to avoid:**
+Keep the `type === 'CHARGE'` guard unchanged. Treat FEE-FIX-01 as a diagnostic task first: add logging to inspect all transaction types, fee amounts, and `associatedOrder` nullability from a live Shopify Payments store before touching the write-back logic. The existing null guard on `associatedOrder` must remain. Verify the `transaction.fees` field path (the plural `fees` vs. singular `fee`) against the 2025-10 API schema — this was a flagged open question from v1.0.
+
+**Warning signs:**
+- `feesTotal` values drop to zero after a payout sync run
+- Orders with partial refunds showing higher profit margin than before payout sync
+- Developer adding `type === 'REFUND'` or removing the `type !== 'CHARGE'` guard
+
+**Phase to address:**
+FEE-FIX-01 (Payout fee verification). Run diagnostic logging on live data before writing any code changes.
 
 ---
 
-### Pitfall 1: Treating REST Order Pagination as Reliable for Historical Syncs
+### Pitfall 2: Meta/Google OAuth Popup Is Blocked Inside the Shopify Admin Iframe
 
-**What goes wrong:** The REST `/admin/api/orders.json` endpoint returns max 250 orders per page and uses cursor-based `page_info` tokens. Developers write a simple loop assuming pages are stable — but `page_info` tokens expire after a short window (~30 seconds of inactivity). A slow sync loop (or one that retries failed pages) hits expired cursors, restarts from page 1, and produces duplicate data or an infinite loop.
+**What goes wrong:**
+The app runs embedded inside `admin.shopify.com` via iframe. When frontend code calls `window.open()` to launch a Meta or Google OAuth URL, browsers treat the call as a popup from a sandboxed iframe context and block it. Even when `window.open()` succeeds, the OAuth callback cannot reliably use `postMessage` back to the parent because `admin.shopify.com` is not the app's origin and controls the surrounding frame. The OAuth state hangs: the popup completes its server-side callback but the parent iframe has no mechanism to detect completion.
 
-**Why it happens:** The REST docs show `page_info` as the next-page mechanism without prominently warning about token expiry. Developers test with small stores (< 250 orders) and never hit pagination at all.
+**Why it happens:**
+Developers copy OAuth popup patterns from non-embedded web apps where `window.open()` + `postMessage` between same-origin windows works cleanly. Inside Shopify's admin iframe there are two additional restriction layers: browser popup blockers apply stricter heuristics to iframes, and the App Bridge shell may intercept navigation events.
 
-**Consequences:** Duplicate orders in the local database, inflated revenue figures, silent data corruption that's very hard to detect after the fact.
+**How to avoid:**
+Use a server-side redirect flow: when the merchant clicks "Connect Meta Ads," use `window.top.location.href = oauthUrl` to escape the iframe entirely before starting the OAuth flow. The callback completes server-side, stores the token, and redirects back to the app URL (which Shopify then re-embeds). Do not attempt `window.open()` or postMessage-based popup close from within the iframe. Test explicitly in Safari — Safari's ITP applies stricter third-party restrictions that block behaviors Chrome allows.
 
-**Prevention:**
-- Use the **GraphQL Bulk Operations API** (`bulkOperationRunQuery`) for initial historical syncs of large order sets. It runs asynchronously server-side and returns a JSONL file download — no pagination, no token expiry, no rate limits during the export.
-- For incremental syncs (catching up new orders), use `orders.json?updated_at_min={timestamp}&limit=250` with `created_at` ordering and persist the high-water mark timestamp after each successful page, not after each loop.
-- Store a `sync_cursor` per shop in the database so syncs are resumable after crashes.
+**Warning signs:**
+- "Popup blocked" errors in browser console during OAuth initiation
+- OAuth window opens but app state does not update after callback completion
+- Connect flow tested only in standalone browser tab, not inside Shopify admin iframe
+- Safari not tested before shipping
 
-**Warning signs:** Orders table row count jumps unexpectedly between syncs. Revenue totals don't match Shopify's own analytics for the same period.
-
-**Phase:** Initial data sync (Phase 1 MVP — order/product sync feature).
-
----
-
-### Pitfall 2: REST API 429 Rate Limits Killing Background Syncs
-
-**What goes wrong:** Shopify's REST API enforces a leaky-bucket rate limit: 40 requests/second bucket, refill rate of 2 requests/second (standard) or 4/second (Shopify Plus). A background sync job that fires requests in a tight loop exhausts the bucket within seconds, receives `429 Too Many Requests`, retries immediately (exponential backoff not implemented), and either locks the shop out of API access for the sync duration or triggers Shopify to flag the app for abuse.
-
-**Why it happens:** Node.js `Promise.all()` on a large array of order IDs fires all requests simultaneously. No throttling is applied. Works fine in dev with 10 test orders; breaks instantly with 5,000 real orders.
-
-**Consequences:** Sync never completes for large stores. Merchant sees stale/empty dashboard. If abuse is flagged, Shopify can restrict the app's API access for that shop permanently.
-
-**Prevention:**
-- Always respect the `X-Shopify-Shop-Api-Call-Limit` response header (format: `used/bucket_size`, e.g. `38/40`). Implement a simple token-bucket consumer that backs off when `used / bucket_size > 0.8`.
-- For bulk operations use the GraphQL Bulk API instead of looping REST calls — it has separate, much higher limits.
-- For incremental syncs, process pages sequentially (not in parallel) with a 500ms delay between pages as a safe default.
-- Implement exponential backoff with jitter on 429 responses: start at 2s, cap at 60s.
-- Use a per-shop queue (e.g., Bull/BullMQ backed by Redis, or a simpler in-process queue for MVP) to serialize sync jobs and prevent simultaneous syncs for the same shop.
-
-**Warning signs:** Logs show frequent 429 responses. Sync jobs time out for stores with > 1,000 orders.
-
-**Phase:** Phase 1 MVP (order sync). Also affects Phase 2 when adding product/payout syncs.
+**Phase to address:**
+ADS-01 (Meta Ads OAuth). Establish this redirect pattern first. Reuse the same pattern for ADS-02 (Google Ads OAuth) — do not re-discover this issue independently.
 
 ---
 
-### Pitfall 3: Calculating Shopify Transaction Fees Without Accounting for Plan Differences
+### Pitfall 3: Ad Platform OAuth Tokens Stored Plaintext Following the ShopSession Pattern
 
-**What goes wrong:** The developer hard-codes a single transaction fee rate (e.g., 2% or 0%) instead of dynamically detecting the merchant's Shopify plan. Shopify's transaction fees (separate from Shopify Payments processing fees) vary by plan:
+**What goes wrong:**
+The existing `ShopSession` model stores the Shopify `accessToken` as a plaintext `String`. Reusing this pattern for Meta long-lived user access tokens and Google OAuth refresh tokens is a meaningful security step down. These tokens represent persistent, scoped access to a merchant's ad account billing and campaign data. A database compromise exposes all connected merchants' ad accounts permanently.
 
-| Plan | Transaction Fee (non-Shopify Payments) |
-|------|----------------------------------------|
-| Basic | 2% |
-| Shopify | 1% |
-| Advanced | 0.5% |
-| Plus | 0.15% |
-| Shopify Payments enabled | 0% (waived entirely) |
+**Why it happens:**
+The existing Shopify token storage sets a precedent. Shopify's own access tokens are also plaintext, which normalizes the pattern. Time pressure during initial OAuth implementation leads developers to defer encryption as a "later hardening task" that never ships.
 
-A merchant on Basic who uses PayPal (external gateway) pays 2% to Shopify on top of PayPal's own fees. Hardcoding 0% makes profit look $200–$400/month higher than reality for a $10K/month store on Basic.
+**How to avoid:**
+Create separate models (`MetaAdConnection`, `GoogleAdConnection`) — do not extend `ShopSession`. Store tokens as `encryptedAccessToken` and `encryptedRefreshToken` columns with a symmetric AES-256-GCM encryption wrapper keyed by an `ENCRYPTION_KEY` environment variable. The encryption/decryption wrapper should be a single shared utility (`lib/encrypt.js`) so it is not reimplemented inconsistently. Add `ENCRYPTION_KEY` to Railway config before any token can be written.
 
-**Why it happens:** Developers test in development stores (which often default to Basic or mock Plus behavior) and miss that the plan affects fees. The fee rate isn't on the order object — it must be inferred from the shop's plan.
+**Warning signs:**
+- New ad connection schema adds `accessToken String` columns mirroring ShopSession
+- No `ENCRYPTION_KEY` environment variable in Railway config or `.env.example`
+- Token column names do not carry an `encrypted_` prefix making the intent opaque
 
-**Consequences:** Systematically wrong profit calculations. Merchants discover discrepancy, lose trust, churn.
-
-**Prevention:**
-- Call `GET /admin/api/shop.json` on install (and re-check periodically) and store `plan_name` in the `ShopSession` record.
-- Map `plan_name` to the correct transaction fee rate in a config table, not in business logic.
-- When gateway is `shopify_payments`, apply 0% transaction fee regardless of plan.
-- Expose the detected plan and fee rate in the UI so merchants can verify the assumption.
-- Listen for the `shop/update` webhook to detect plan upgrades/downgrades and recalculate affected historical orders.
-
-**Warning signs:** Profit calculations off by exactly 0.5–2% of revenue. QA only done on development stores.
-
-**Phase:** Phase 1 MVP (fee calculation feature). Must be correct before any orders are displayed.
+**Phase to address:**
+ADS-01 (Meta Ads OAuth). Establish the encryption pattern before shipping the first ad token. Do not revisit for Google Ads — reuse the same utility.
 
 ---
 
-### Pitfall 4: Missing Shopify Payments Processing Fee Tiers (Not Just Transaction Fees)
+### Pitfall 4: Meta Ads Attribution Window Mismatch Creates Apparent Double-Counting
 
-**What goes wrong:** Even when using Shopify Payments (no transaction fee), the card processing rate itself varies by plan:
+**What goes wrong:**
+Meta's Insights API default attribution window is 7-day click / 1-day view. A query for "spend attributed to conversions today" from Meta includes conversions from ad impressions up to 7 days prior. If the app joins Meta-reported conversions to Shopify order IDs expecting a 1:1 match, a single Shopify order can be credited to multiple campaigns simultaneously. Summing Meta-reported spend-per-conversion will overcount total ad spend versus what was actually billed to the ad account.
 
-| Plan | Online Credit Card Rate |
-|------|------------------------|
-| Basic | 2.9% + 30¢ |
-| Shopify | 2.6% + 30¢ |
-| Advanced | 2.4% + 30¢ |
-| Plus | Negotiated (often ~2.15%) |
+Meta changed the default attribution in June 2025: the Insights API now enforces unified attribution settings automatically, aligning more closely with Ads Manager. Querying without specifying `action_attribution_windows` may return different numbers than before June 2025.
 
-And international cards, AMEX, and manual payments have different rates still. Developers apply a flat 2.9% + 30¢ to all Shopify Payments orders, which is wrong for most merchants above Basic.
+**Why it happens:**
+Developers pull campaign spend from Meta and also pull Meta's reported conversions, then try to reconcile the two against Shopify orders. Meta's "reported conversions" are not Shopify orders — they are Meta-attributed conversion events within the attribution window. The numbers do not reconcile 1:1 with Shopify order data.
 
-**Why it happens:** The processing fee is NOT on the order or transaction object from the API. It must be calculated from plan data + payment method + card type (which isn't always available).
+**How to avoid:**
+Use campaign-level total billed spend from Meta (the `spend` field in Insights), NOT Meta's reported conversion counts or ROAS. Store spend as `campaignSpend` aggregated to campaign + date. For per-order attribution, apportion daily campaign spend across orders placed that day using revenue-weighted distribution: `order_ad_cost = total_daily_campaign_spend * (order_revenue / total_daily_shopify_revenue)`. Never import Meta's `actions` or `purchase` conversion events as a proxy for Shopify orders. Document the attribution model in code comments and surface it in the UI ("Estimated ad cost using daily revenue-weighted apportionment").
 
-**Consequences:** Profit overstated for Shopify/Advanced/Plus merchants using Shopify Payments.
+**Warning signs:**
+- Queries joining Meta `actions` (conversion events) directly to Shopify `order.id`
+- Total attributed ad spend in the app exceeds the amount billed on the Meta ad account
+- No `action_attribution_windows` parameter set on Insights API calls — relies on account default
 
-**Prevention:**
-- Check `order.payment_gateway` to determine if Shopify Payments was used.
-- Use the shop's plan to select the base Shopify Payments rate from a config table.
-- For external gateways (PayPal, Stripe, etc.), apply the external gateway's known rate OR — better — allow merchants to input their actual gateway rate in settings. You cannot know PayPal's rate from the Shopify API.
-- For MVP: display a clear "estimated processing fee" label and provide a gateway rate override setting per merchant.
-- Access `order.transactions[]` for actual payment amounts and gateway details, but note that Shopify does NOT expose the actual fee charged in the transactions object (only the amount paid).
-
-**Warning signs:** Profit calculation assumes all merchants pay 2.9% + 30¢. No plan-dependent processing fee table exists in code.
-
-**Phase:** Phase 1 MVP. Consider a "gateway rates settings page" as a quick MVP escape hatch.
+**Phase to address:**
+ADS-03 (Attribution model). Write the attribution design document before any code. Total attributed spend must be auditable against Meta billing.
 
 ---
 
-### Pitfall 5: Refund Handling — Double-Counting or Ignoring Refund Fee Recouping
+### Pitfall 5: Google Ads Developer Token Approval Delay Blocks the Phase
 
-**What goes wrong:** When a refund is issued, the gross revenue decreases by the refund amount, but the handling of fees is wrong in almost every amateur implementation:
+**What goes wrong:**
+The Google Ads API requires a developer token from a Google Ads Manager account. New applications start at Test Account Access (cannot reach production ad data) and require manual review by Google to reach Basic or Standard Access. As of February 2026, Google publicly acknowledged increased review delays due to application volume growth. A developer token application submitted at the start of the Google Ads implementation phase could take days to weeks to reach Basic Access, blocking the ability to test against any real merchant ad account.
 
-1. **Shopify Payments refund behavior:** Shopify refunds the merchant the processing fee on the refunded amount (the payment processor returns it). So a $100 order at 2.9% + 30¢ = $3.20 in fees. A full refund means $3.20 is returned to the merchant by the processor — but only the transaction fee, not the Shopify plan transaction fee (that is NOT recouped).
-2. **Partial refunds:** A $50 partial refund on a $100 order does not mean 50% of fees are returned. The fixed 30¢ component is typically not returned on partial refunds.
-3. **Refund-only orders:** Some stores issue manual refunds on already-fulfilled orders. These appear as negative line items and must reduce revenue without being counted as a separate negative "order."
+**Why it happens:**
+Developers treat the developer token as an implementation step to handle during the phase, not a blocking prerequisite. The Meta Ads API has no equivalent gating step (Advanced Access for production requires app review but development-mode access works immediately), leading developers to assume Google works the same way.
 
-**Why it happens:** Developers subtract `refund.transactions[].amount` from revenue but forget to adjust the fee model accordingly. They never test with partial refunds or stores with high return rates.
+**How to avoid:**
+Apply for the Google Ads API developer token before the Google Ads phase begins — the right time is during or immediately after the Meta Ads phase. Use Test Account Access for initial development: all data model work, OAuth flow, and spend-fetch logic can be built and tested against test accounts. The switch to production data requires no code change once Basic Access is approved. List "developer token at minimum Test Account Access confirmed" as a hard prerequisite in the ADS-02 phase definition.
 
-**Consequences:** Profit is wrong for any store with > 1% refund rate. A store doing $50K/month with 5% refund rate has $2,500/month of incorrectly modeled fees.
+**Warning signs:**
+- Developer token application not submitted when ADS-02 phase kicks off
+- No test Google Ads Manager account created
+- Phase plan does not list developer token status as a prerequisite check
 
-**Prevention:**
-- Model refunds as separate adjustments to both revenue AND fees. Create a `refund_adjustments` column or separate table.
-- For Shopify Payments: when a full refund occurs, mark the processing fee as returned (set `processing_fee_net = 0` for that order).
-- For partial refunds: proportionally reduce the percentage component of the fee, but not the fixed component.
-- Shopify transaction fees (the plan-based %) are NOT returned on refunds — they are a permanent cost.
-- Use `order.refunds[]` array and `refund.transactions[]` to reconstruct the actual cash flow per order.
-- Write a test suite with refund scenarios before shipping: full refund, partial refund, multi-item partial refund, refund with restocking fee.
-
-**Warning signs:** No special handling for `order.financial_status === 'refunded'` or `'partially_refunded'`. Fee calculation doesn't reference `order.refunds`.
-
-**Phase:** Phase 1 MVP. Refunds must be modeled correctly from day 1 — retrofitting is difficult once merchants have historical data.
+**Phase to address:**
+Must be initiated during ADS-01 (Meta Ads phase) or earlier. ADS-02 phase should not begin without confirming the application is at least submitted.
 
 ---
 
-### Pitfall 6: COGS at Order Placement vs. COGS at Time of Sale (Historical Changes)
+### Pitfall 6: Meta Long-Lived Token Expiry Silently Breaks Spend Sync
 
-**What goes wrong:** A merchant sells 100 units of a product in January at $5 COGS, then updates the COGS to $7 in February. The app re-calculates January profit using the new $7 COGS, making January look less profitable than it was. Worse: if COGS is deleted entirely (product archived), all historical orders for that product show $0 COGS, inflating historical profit.
+**What goes wrong:**
+Meta long-lived user access tokens expire after approximately 60 days. If the app does not implement token lifecycle tracking, merchants who connected their Meta account at launch will silently stop receiving spend data at day 60. The sync job will receive a 190 error (OAuthException — token expired or revoked). If this error is swallowed or logged without surfacing a reconnect prompt, merchants see stale or missing ad spend data with no explanation. They do not know their data stopped updating.
 
-**Why it happens:** COGS is stored as a current value on the product/variant record. When the app calculates historical order profit, it joins to the current COGS record instead of the COGS at the time of the sale.
+**Why it happens:**
+The initial OAuth connect flow focuses on "make it work." Token lifecycle — expiry detection, proactive refresh, re-auth prompts — is deferred as polish. Token expiry at day 60 affects all early adopters simultaneously if no rotation was implemented.
 
-**Consequences:** Historical profit reports are retroactively rewritten every time COGS changes. Trust in the dashboard evaporates when a merchant notices January looks different than it did last month.
+**How to avoid:**
+At token storage time, record `tokenExpiresAt = NOW() + 55 days` (5-day conservative buffer). The daily spend sync job checks `tokenExpiresAt` before making any API call and surfaces a "reconnect required" UI state when the token is within 7 days of expiry. Facebook's token debug endpoint can extend a non-expired long-lived token by re-exchanging it; implement proactive rotation in the daily sync job. For Google Ads, refresh tokens do not have a fixed expiry but can be revoked — detect 401/invalid_grant errors distinctly and surface a reconnect prompt.
 
-**Prevention:**
-- Store COGS as a **time-series** (variant_id, effective_from, effective_until, cost_per_unit) rather than a single scalar.
-- When an order is synced (or when COGS is updated), snapshot the current COGS onto the order line item record in the local database. Do not calculate COGS on-the-fly at query time by joining to the current COGS value.
-- When COGS is updated, recalculate only future orders going forward (or present the merchant with a "recalculate historical" option with an explicit confirmation dialog).
-- For missing COGS: treat as `NULL` (unknown), not as `$0`. Show a separate "COGS unset" indicator in the UI rather than counting it as zero-cost profit.
+**Warning signs:**
+- No `tokenExpiresAt` column in the MetaAdConnection schema
+- Sync job does not distinguish 190 (token expired) from other Meta API errors
+- No UI state for "ad account disconnected — reconnect required"
+- No reconnect flow tested after token invalidation
 
-**Warning signs:** COGS stored as a single value on a product/variant table with no `effective_date`. Historical profit reports change when COGS is edited.
-
-**Phase:** Phase 1 MVP. Data model must be correct before any COGS entry feature is built.
-
----
-
-### Pitfall 7: Variant-Level COGS Collapsed to Product-Level
-
-**What goes wrong:** A T-shirt comes in Small ($3 COGS) and XL ($4 COGS, different supplier). The developer stores one COGS per product (not per variant), averages it to $3.50, and applies that to every sale. A store selling 80% XL has incorrect COGS for every order.
-
-**Why it happens:** The product page in Shopify admin shows variants but most UI prototypes show one COGS field per product. Developer under-estimates variant cardinality in real stores (one product can have 100+ variants).
-
-**Consequences:** COGS is wrong for any store with multi-variant products where variants have meaningfully different costs (which is most real apparel, electronics, and bundle stores).
-
-**Prevention:**
-- Data model must be at `variant_id` level, not `product_id` level. `ProductCogs(id, shop_id, variant_id, cost, effective_from)`.
-- UI should show the product name as a grouping label, with per-variant COGS fields below it.
-- CSV import must support a `variant_id` or `sku` column for variant-level mapping.
-- For variants without individual COGS, allow a product-level default that applies to all variants unless overridden.
-- When fetching order line items from Shopify, always use `line_item.variant_id` (not `product_id`) for COGS lookup.
-
-**Warning signs:** COGS database table has a `product_id` column but no `variant_id` column. CSV import template doesn't include a SKU or variant ID column.
-
-**Phase:** Phase 1 MVP (data model must be right before any COGS entry is built).
+**Phase to address:**
+ADS-01 (Meta Ads OAuth). Build token expiry tracking into the initial schema definition — not as a follow-up task. The reconnect prompt UI must ship with the initial connect flow.
 
 ---
 
-### Pitfall 8: Missing COGS Silently Treated as Zero
+### Pitfall 7: Recharts Waterfall Chart — Floating Bar Stacking Breaks with Negative Segments
 
-**What goes wrong:** An order contains 3 line items. COGS is set for 2 of them. The third has no COGS. The app calculates profit as: `revenue - known_cogs - fees`, treating the missing COGS as $0. The profit figure is shown without any warning. The merchant thinks they're making 40% margin when the actual margin might be 15%.
+**What goes wrong:**
+Recharts has no native waterfall chart type. The standard workaround uses a BarChart with `stackId` and a transparent "spacer" bar to float each visible bar at the correct cumulative position. This approach breaks when a segment is negative (e.g., a net loss after all deductions): the stacking math places the visible bar at the wrong Y position because Recharts stacks from zero, not from the running total. The result is bars that appear to start from zero instead of floating above or below the previous bar's endpoint.
 
-**Why it happens:** A `NULL` in the COGS join query is coerced to `0` (via `COALESCE(..., 0)` or implicit JavaScript falsy behavior). Developer tests only with COGS fully filled in.
+This app's waterfall represents: Revenue → minus COGS → minus Fees → minus Shipping → Net Profit. If Net Profit is negative (loss order), the terminal bar will render incorrectly without explicit handling.
 
-**Consequences:** Merchant makes inventory and pricing decisions on wrong data. The app is worse than useful — it's actively misleading.
+Additionally: if `cogsTotal` is `null` (unknown COGS), the standard running-total calculation produces `NaN` for all subsequent bars, rendering the entire chart blank without an obvious error.
 
-**Prevention:**
-- Track COGS coverage per order: what % of line item revenue has COGS assigned.
-- In profit display: show "Profit (X% of revenue has COGS set)" when coverage is < 100% for the selected date range.
-- Use a separate `cogs_coverage_pct` column on the orders table, updated on sync and on COGS changes.
-- Never coerce NULL COGS to 0 in financial calculations. Use a three-state model: `known_profit`, `estimated_profit` (partial COGS), `unknown_profit`.
-- Dashboard summary should show a banner: "42 orders missing COGS — profit may be understated by up to $X."
+**Why it happens:**
+Recharts waterfall examples in documentation and community tutorials use only positive-value examples. Developers implement the spacer-bar pattern, test with positive-margin orders, and ship without testing a loss order or an order with null COGS.
 
-**Warning signs:** SQL query uses `COALESCE(cogs.cost, 0)` in profit calculation. UI shows profit without any "COGS coverage" indicator.
+**How to avoid:**
+Pre-compute waterfall segments server-side and return an explicit `[low, high]` tuple for each bar segment, not a running total. Use `Bar` with array data format: `[startValue, endValue]` instead of relying on stack accumulation. Color each bar based on sign: green for positive (revenue, profit), red for deductions (COGS, fees, shipping). For null COGS: render a placeholder bar with a distinct "COGS unknown" pattern and suppress the net profit bar entirely (consistent with the existing `cogsKnown` semantics already in the data model). Test explicitly with: a loss order, a zero-margin order, a partial refund order, and a null-COGS order.
 
-**Phase:** Phase 1 MVP (affects all profit display).
+**Warning signs:**
+- Waterfall data computed in the frontend by accumulating running totals
+- No test case for an order where `netProfit < 0`
+- No test case for an order where `cogsTotal === null`
+- Chart library updated without re-testing negative segment rendering
 
----
-
-### Pitfall 9: App Bridge Session Token Not Validated on Every API Request
-
-**What goes wrong:** The existing scaffold uses offline OAuth tokens for API calls to Shopify. When adding a React frontend via App Bridge, the frontend makes requests to the Express backend (e.g., `GET /api/orders`). Developers often check only for the presence of a `shop` query parameter instead of validating the App Bridge session token on each request. This allows any HTTP client with a valid `shop` parameter to access merchant data without going through Shopify's iframe authentication.
-
-**Why it happens:** The offline token OAuth flow (already implemented) is for server-to-server Shopify API calls. App Bridge generates a separate short-lived session token (JWT) for authenticating the embedded app frontend to the app's own backend. These are two different authentication mechanisms and are easy to conflate.
-
-**Consequences:** Unauthenticated API access to merchant data. App review rejection for security issues.
-
-**Prevention:**
-- Use `@shopify/shopify-api` library's `shopify.session.decodeSessionToken(token)` to validate App Bridge JWTs on every protected API endpoint.
-- The React frontend should call `shopify.idToken()` (App Bridge 4.x) to get the session token and include it as a `Authorization: Bearer {token}` header on every fetch call to the Express backend.
-- Middleware pattern: create a `requireAppBridgeAuth` Express middleware that validates the JWT before any API route handler runs.
-- Do NOT rely on the `shop` query parameter alone for authorization.
-
-**Warning signs:** Express API routes for order/COGS data check `req.query.shop` but do not validate any JWT. No `Authorization` header handling in middleware.
-
-**Phase:** Phase 1 MVP (must be in place before any `/api/*` endpoints are created).
+**Phase to address:**
+CHART-01 (Waterfall chart). Compute the `[low, high]` tuple server-side in the API endpoint. Frontend only renders — no data transformation in the component.
 
 ---
 
-### Pitfall 10: CSP `frame-ancestors` Breaking After Adding App Bridge 4.x
+### Pitfall 8: Margin Alerts That Fire Immediately Cause Alert Fatigue
 
-**What goes wrong:** The existing scaffold sets `Content-Security-Policy: frame-ancestors 'none' https://{shop} https://admin.shopify.com` on the admin route. This works for the current inline HTML page. When React + App Bridge 4.x is introduced and uses `@shopify/app-bridge-react`, it may load resources from CDNs or Shopify's own script hosts. A strict CSP that doesn't include `cdn.shopify.com` and `*.shopifycloud.com` in `script-src` and `img-src` will break App Bridge initialization silently (no console error in embedded iframe context, just a blank screen).
+**What goes wrong:**
+A margin alert system that fires on day one of data ingestion floods merchants with alerts for every product below the threshold, most of which are there because COGS is not fully configured yet or because the sample size is too small (1-2 orders) to be statistically meaningful. Merchants dismiss all alerts, disable the feature, and never re-enable it. The alert value is permanently destroyed.
 
-**Why it happens:** The developer adds App Bridge, tests locally with `shopify app dev` (which relaxes CSP for development), and ships to production without verifying CSP headers against the production embedded context.
+**Why it happens:**
+Alert thresholds are simpler to implement without minimum order count guards or COGS coverage requirements. Developers test with a well-configured store where alerts make sense and never see the noise that a newly onboarded merchant experiences.
 
-**Consequences:** Blank white screen in Shopify admin for all merchants. The dashboard is completely unusable.
+**How to avoid:**
+Alert eligibility requires: (1) a minimum of 7 days of order history for the product, (2) a minimum of 3 orders in the period, and (3) `cogsKnown = true` for those orders (alerts on unknown-COGS products are meaningless noise). Alerts must auto-resolve when margin recovers above threshold — do not let the resolved alert list accumulate. Surface alerts with the actionable context: the margin percentage, the threshold, and the delta (e.g., "12% margin — 3 points below your 15% threshold"). Avoid email/push notifications for v2.0; in-app alerts only until the pattern proves useful.
 
-**Prevention:**
-- CSP for embedded Shopify apps needs at minimum:
-  ```
-  Content-Security-Policy:
-    frame-ancestors https://{shop} https://admin.shopify.com;
-    script-src 'self' https://cdn.shopify.com;
-    style-src 'self' 'unsafe-inline' https://cdn.shopify.com;
-    img-src 'self' data: https://cdn.shopify.com;
-    connect-src 'self' https://{shop};
-  ```
-- Build a CSP test: after setting up the embedded React page, open it in a real Shopify store (not dev tunnel), open browser devtools network tab, and check for CSP violation errors.
-- The existing `shop` parameter injection into the CSP header (noted in CONCERNS.md) must be hardened to strict regex before adding more CSP directives — a CSP injection here affects the entire app security posture.
+**Warning signs:**
+- Alert query has no minimum `orderCount` filter
+- Alert query runs against orders with `cogsKnown = false`
+- No `resolvedAt` column — alerts never automatically dismiss
+- Alert fires on any product with margin below threshold regardless of data quality
 
-**Warning signs:** CSP header only has `frame-ancestors`. No `script-src` directive. Tested only via `shopify app dev` tunnel.
-
-**Phase:** Phase 1 MVP (when React frontend is introduced).
+**Phase to address:**
+ALERT-01 (Margin alerts). Define the eligibility criteria before writing the alert query. Include auto-resolve logic in the initial implementation.
 
 ---
 
-### Pitfall 11: Shopify Billing API — Subscription Created But Merchant Redirected Away Before Acceptance
+## Technical Debt Patterns
 
-**What goes wrong:** The billing flow requires two steps: (1) create a `RecurringApplicationCharge` (REST) or `appSubscriptionCreate` (GraphQL), get a `confirmation_url`, and (2) redirect the merchant to that URL to accept. Developers create the charge but skip checking whether the merchant actually accepted it before provisioning access. If the merchant closes the tab or clicks "Decline," the app still works because the developer only checks "did a charge object exist" not "is the charge status `active`."
-
-**Why it happens:** The confirmation_url redirect and post-acceptance callback are treated as guaranteed. Developers test only the happy path.
-
-**Consequences:** Merchants use the app for free indefinitely. Shopify will not auto-enforce billing — that's entirely the app's responsibility.
-
-**Prevention:**
-- Always verify charge status via `GET /admin/api/recurring_application_charges/{id}.json` (status must be `active`) before granting full access.
-- After the merchant is redirected back (via the `return_url` you set), query Shopify to confirm the charge status. Do not trust the `charge_id` in the return URL query param as proof of acceptance.
-- Store the `charge_id` and `status` in the `ShopSession` table. Recheck status on each admin page load during the billing grace period.
-- Implement a "billing gate" middleware: if shop is not on an active subscription after a trial period, redirect to a billing prompt page.
-
-**Warning signs:** No `status` field on ShopSession. Charge status not verified on the return URL callback. Billing check only happens at install, never on subsequent page loads.
-
-**Phase:** Billing feature phase (Phase 2 or whenever monetization is implemented).
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Store ad tokens plaintext following ShopSession pattern | Faster initial OAuth implementation | Any DB compromise exposes all merchants' ad accounts permanently | Never |
+| Use Meta reported conversions instead of Meta billed spend | Simpler data join to Shopify orders | Double-counts spend, destroys profit accuracy, merchants lose trust | Never |
+| Skip token expiry tracking on first OAuth ship | Ship connect flow faster | All early adopters' data silently stops updating at day 60 | Never |
+| Poll Meta/Google spend API on every dashboard load | No caching layer required | Rate limit exhaustion at very first merchant with significant campaign count | Never |
+| Compute waterfall segments in React component | Simpler API contract | Chart breaks on loss orders and null-COGS; frontend calculates financial data | Never |
+| Alert on all products below threshold with no minimum order count | Alerts fire immediately | Alert fatigue; merchants disable alerts permanently within the first week | Never |
+| Apply Google developer token application late | No pre-planning required | Blocks entire ADS-02 phase if application is under review | Never — apply during ADS-01 |
 
 ---
 
-### Pitfall 12: Shopify Billing API — Test Mode Charges Behave Differently Than Real Charges
+## Integration Gotchas
 
-**What goes wrong:** Development stores and test-mode charges return `status: 'active'` immediately without going through the confirmation flow. Real production charges require the merchant to confirm in the Shopify admin. Developers build and test the billing flow with `test: true` or in a development store, where everything "just works." In production, the confirmation redirect is a real page, takes merchant action, and the return URL timing is unpredictable.
-
-**Why it happens:** Development-only testing is convenient. The test mode difference in UX is not obvious from the API response alone.
-
-**Consequences:** Billing flow broken in production (redirect works, but the app doesn't handle the "declined" or "pending" state). Merchants either can't activate or get past the billing gate despite not completing payment.
-
-**Prevention:**
-- Test billing with a real (non-development) Shopify store using a test credit card before shipping.
-- Handle all charge status values explicitly: `pending`, `active`, `declined`, `expired`, `frozen`, `cancelled`.
-- Use the `app/subscriptions/update` webhook to receive real-time status changes rather than polling.
-- Set `test: process.env.NODE_ENV !== 'production'` so test mode is not accidentally left on in production.
-
-**Warning signs:** Billing tested only on development stores. No handling for `declined` or `pending` charge status. `test: true` hardcoded.
-
-**Phase:** Billing feature phase.
-
----
-
-### Pitfall 13: App Review Rejection — Accessing Scopes Beyond What the App Uses
-
-**What goes wrong:** The existing `.toml` config requests 60+ scopes (noted in INTEGRATIONS.md). Shopify's app review process specifically rejects apps that request scopes not actively used. Reviewers check network traffic and database writes during review. Requesting `write_customers` or `read_analytics` for an app that only reads orders will trigger rejection.
-
-**Why it happens:** Developers copy a maximal scope set from documentation/templates "just in case." It feels safer to have more access. Shopify's review became stricter about scope minimization after 2023.
-
-**Consequences:** App review rejected. Rejection reason given but time to re-review adds 1-3 weeks delay. If scopes are trimmed, existing installations need to re-authorize (friction for merchants).
-
-**Prevention:**
-- Audit actual API endpoints used and request only those scopes. For Phase 1 MVP:
-  - `read_orders` — order data
-  - `read_products` — product/variant data for COGS mapping
-  - `read_inventory` — optional, for inventory cost data if using Shopify's built-in cost field
-  - `read_shipping` — if shipping cost sync is added
-  - `read_finance` — for payouts/transactions (Shopify Balance)
-  - No `write_*` scopes unless the app modifies Shopify data
-- Document scope justification in the app submission notes (reviewers look at this).
-- Never request `read_customers` or `read_customer_payment_methods` unless the app directly surfaces customer data.
-
-**Warning signs:** `shopify.app.profit-tracker.toml` requests 60+ scopes. Scope list has `write_customers`, `read_analytics`, or other broad scopes unused by the profit dashboard feature set.
-
-**Phase:** Pre-submission (before any app review submission). Scope list must be finalized before submission, not after rejection.
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| Shopify Payments balanceTransactions | Processing REFUND or ADJUSTMENT types to offset fees | Only process CHARGE type; fee credits appear as separate CREDIT entries |
+| Shopify Payments balanceTransactions | Not guarding `associatedOrder === null` | Skip rows with null associatedOrder — several transaction types return null by design |
+| Shopify Payments balanceTransactions | Querying `fees` (plural) vs `fee` (singular) field | The GraphQL schema uses `fee { amount }` (singular) — verify against 2025-10 schema before FEE-FIX-01 |
+| Meta Ads Insights API | Using `actions.purchase` conversion count as Shopify order proxy | Pull campaign `spend` only; never use Meta's conversion counts as order ground truth |
+| Meta Ads Insights API | Not setting `action_attribution_windows` parameter | Since June 2025, Meta enforces unified attribution by default — specify the window explicitly to get consistent data |
+| Meta Ads Insights API | Assuming API timezone is UTC | Meta data is in the ad account's configured timezone — normalize to UTC before joining Shopify `processedAt` |
+| Meta OAuth in Shopify iframe | `window.open()` for OAuth popup | Use `window.top.location.href = oauthUrl` to escape iframe; complete flow as server-side redirect |
+| Google Ads API | Missing `login-customer-id` header | Required when merchant's ad account is under a Manager (MCC) account; omitting it returns permission errors |
+| Google Ads API | Using account-local timezone for date range queries | Google Ads reports in the account's timezone — align date ranges to match, then normalize to UTC for storage |
+| Google Ads API | Expecting immediate production access | Test Account Access only — apply for Basic Access early; no code change required when approved |
+| Meta token storage | Storing short-lived user token directly after OAuth callback | Exchange for long-lived token immediately on callback; store with `tokenExpiresAt` |
+| CSP headers | Frontend calling `graph.facebook.com` or `googleads.googleapis.com` directly | All ad platform API calls go through backend routes; add `connect-src` only for the app's own backend origin |
 
 ---
 
-### Pitfall 14: GDPR Webhook Stubs Will Fail App Review
+## Performance Traps
 
-**What goes wrong:** The existing codebase (flagged in CONCERNS.md) has `customers/redact`, `customers/data_request`, and `shop/redact` as empty stubs that return 200 OK without doing anything. Shopify's app review process **tests these webhooks by sending real requests** and verifying that data deletion actually occurs. Stubs that return 200 but don't process the request will fail review.
-
-**Why it happens:** These webhooks are required to register but are seen as boilerplate. Developers defer implementation. Shopify added automated testing of GDPR compliance in their review process.
-
-**Consequences:** Guaranteed app review rejection. Also a legal/compliance issue if the app is ever audited.
-
-**Prevention:**
-- `customers/redact`: Delete or anonymize all stored data tied to a customer_id for the given shop. For Phase 1 MVP this means any COGS entries or custom notes associated with a customer if stored, plus any cached customer PII.
-- `customers/data_request`: Return a structured log of all data held for the customer. Minimum viable: email a JSON export to the shop owner.
-- `shop/redact`: Delete ALL data for the shop (called 48 hours after app uninstall). Must actually purge the `ShopSession`, all orders, all COGS entries, etc.
-- Implement these before any app review submission. The `app/uninstalled` webhook handler already deletes `ShopSession` — extend it.
-
-**Warning signs:** Webhook handlers return `res.sendStatus(200)` with no database operations. No `DELETE FROM ...` queries in webhook handlers.
-
-**Phase:** Must be completed before any app review submission (Phase 1 or earlier).
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| Fetching Meta Insights on every dashboard load | 429 rate limit errors; slow dashboard; throttle blocks lasting 60-300s | Sync spend to DB on a scheduled daily job; serve dashboard from DB cache | First merchant with >50 campaigns, first load |
+| Syncing Meta Insights per order instead of per campaign-day | API call count scales with order volume | Aggregate by campaign + date in one API call; apportion mathematically to orders | Any store with >10 orders/day |
+| Re-fetching all payout balance transactions from page 1 on every sync | Entire transaction history re-processed on each sync run | Store payout sync cursor (`lastSyncedAt`) in ShopConfig; use incremental fetches | Stores with 12+ months of transaction history (~5,000+ rows) |
+| Running margin alert query on every page load | Dashboard latency grows with SKU count | Pre-compute alert state during order sync; serve from an alerts table | After ~200 SKUs with COGS configured |
+| Computing waterfall chart data (running totals) in the React component | CPU spike on re-render; incorrect values on null COGS | Compute `[low, high]` tuples server-side; frontend renders only | Any order that has null cogsTotal |
 
 ---
 
-## Moderate Pitfalls
+## Security Mistakes
+
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| Storing Meta/Google OAuth tokens plaintext in PostgreSQL | Full ad account access for all connected merchants if DB is compromised | AES-256-GCM encryption with `ENCRYPTION_KEY` env var; `encrypted_` prefix on column names |
+| Frontend accepting `adAccountId` from the merchant without server-side ownership verification | Merchant can query another merchant's ad spend data | Server verifies the requesting shop owns the `adAccountId` before any ad platform API call |
+| Forwarding Meta/Google API errors verbatim to the frontend | Error messages may expose internal account IDs, token fragments, or quota details | Log full errors server-side; return sanitized generic messages to frontend |
+| Missing CSRF/state validation on third-party OAuth callbacks | State parameter forgery allows account linking hijack | Use the existing `OAuthState` model pattern (already in schema) for ALL third-party OAuth callbacks — Meta and Google — not just Shopify |
+| Not scoping Meta/Google disconnect to the authenticated shop | CSRF attack could disconnect another merchant's ad account | Verify `req.shopDomain` (from JWT) matches the connection record's `shop` before any delete/disconnect operation |
 
 ---
 
-### Pitfall 15: Shopify Payouts API — Payout Timing vs. Order Timing Mismatch
+## UX Pitfalls
 
-**What goes wrong:** A developer fetches Shopify payouts from the Balance API and tries to match them to individual orders for "exact fee reconciliation." Shopify payouts are batched (typically daily), net of fees across many orders, and do not map 1:1 to order IDs in the payout object. Trying to reconcile payouts to orders directly produces mismatches, negative fees, and confusing edge cases (orders paid out across two different payout periods).
-
-**Why it happens:** The word "payout" feels like it should tie to "order" but it's an aggregate cash transfer, not a per-order reconciliation.
-
-**Prevention:**
-- Use payout data for "total cash received this period" verification and cashflow reporting only.
-- Use order-level fee calculation (plan-based rates applied at order time) for per-order profit, not payout data.
-- Treat payouts as a separate cash reconciliation feature, not as the source of truth for fees.
-
-**Warning signs:** Code attempts to `JOIN` payout records to order records by amount or date.
-
-**Phase:** Phase 1 MVP (payout sync feature).
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| No reconnect prompt when ad token is expired | Merchants see $0 ad spend and assume campaigns stopped; make wrong budget decisions | Show "Ad data disconnected — reconnect required" banner with a reconnect action; do not silently show zero |
+| Showing alerts immediately on first week of data | Flood of alerts before baseline is established; merchants disable feature and never re-enable | Require 7-day history + 3 orders minimum before any alert fires |
+| Fixed global margin threshold for all merchants | 5% threshold is meaningless for a 40% margin brand; 30% threshold is unreachable for commodity resellers | Default per-shop threshold (15% is a reasonable default) with easy per-product override |
+| Showing Meta's reported ROAS alongside the app's profit margin in the same view | Merchants compare Meta's optimistic attribution to the app's conservative calculation and conclude the app is wrong | Never show Meta-reported ROAS in the same row as the app's profit figure; keep them in separate clearly-labeled sections with attribution model explanation |
+| Waterfall chart with unlabeled segment bars | Merchants cannot tell which bar represents COGS vs. fees vs. shipping | Every waterfall segment requires a label, a value, and a color that maps to a legend; negative segments should be visually distinct (red) |
+| Margin alerts that never auto-dismiss | Alert list grows indefinitely; becomes visual noise; merchants stop checking | Alerts auto-resolve when margin recovers above threshold; display "resolved" state briefly, then remove |
 
 ---
 
-### Pitfall 16: Order Financial Status vs. Fulfillment Status Confusion
+## "Looks Done But Isn't" Checklist
 
-**What goes wrong:** Developers filter on `fulfillment_status = 'fulfilled'` when calculating profit, missing orders that are paid but not fulfilled (pre-orders, digital goods, subscriptions). Or they include `financial_status = 'pending'` orders (unpaid) in profit totals, inflating revenue.
-
-**Prevention:**
-- Only include orders with `financial_status` in `['paid', 'partially_paid', 'partially_refunded', 'refunded']` for profit calculations.
-- Fulfillment status should not gate profit inclusion — a paid-but-unfulfilled order still generated revenue and fees.
-- Separately track "realized revenue" (paid) vs. "pending revenue" (authorized but not captured).
-
-**Warning signs:** Profit query filters on `fulfillment_status`. Pending/authorized orders appear in profit totals.
-
-**Phase:** Phase 1 MVP.
-
----
-
-### Pitfall 17: React Build Artifacts Served From Express Without Proper Cache Headers
-
-**What goes wrong:** When a React frontend is added to the Express app, the built assets (`bundle.js`, `main.css`) are served from a `/public` or `/dist` directory by Express. Without proper cache headers, Shopify's embedded iframe context re-fetches the entire bundle on every navigation, causing slow load times. With overly aggressive caching, merchants see stale UI after a deploy because their browser cached the old bundle hash.
-
-**Prevention:**
-- Use content-hash filenames for built assets (Vite and Webpack do this by default): `main.a3f8c2.js`.
-- Serve `index.html` with `Cache-Control: no-store` (always fresh).
-- Serve hashed asset files with `Cache-Control: public, max-age=31536000, immutable` (cache forever — the hash changes on deploy).
-- In Express: `app.use('/assets', express.static('dist/assets', { maxAge: '1y', immutable: true }))`.
-
-**Warning signs:** React build output filenames are not hashed. Express serves all static files with identical (or no) cache headers.
-
-**Phase:** When React frontend is introduced (Phase 1 MVP).
+- [ ] **Payout fee fix:** Diagnostic log has been run against a live Shopify Payments store and raw transaction types, fee amounts, and `associatedOrder` nullability have been inspected — not just code logic reviewed
+- [ ] **Payout fee fix:** `transaction.fee { amount }` field path verified against 2025-10 API schema (distinct from the 2025-04 `fees` and `net` fields added in the changelog) on a real query response
+- [ ] **Meta OAuth:** Connect flow tested inside actual Shopify Admin iframe (not standalone browser tab)
+- [ ] **Meta OAuth:** Tested in Safari — Safari's ITP may block behaviors that work in Chrome
+- [ ] **Meta OAuth:** `tokenExpiresAt` column present in MetaAdConnection schema AND checked before every sync job run
+- [ ] **Meta OAuth:** Reconnect prompt renders correctly when token is expired (tested by manually expiring/revoking a test token)
+- [ ] **Google OAuth:** Developer token applied for before ADS-02 phase starts; Test Account Access confirmed
+- [ ] **Google OAuth:** `login-customer-id` header included in requests to client accounts under a manager account
+- [ ] **Ad spend attribution:** Attribution model decision documented in code comments; attribution window configured explicitly, not relying on Meta/Google account default
+- [ ] **Ad spend attribution:** Timezone of Meta/Google spend data normalized to UTC before any join with Shopify `processedAt`
+- [ ] **Ad spend attribution:** Total attributed spend auditable against Meta/Google billing totals for the same period (within rounding)
+- [ ] **Margin alerts:** Alert eligibility query filters out: orders with `cogsKnown = false`, products with fewer than 3 orders, products with fewer than 7 days of history
+- [ ] **Margin alerts:** Auto-resolve works — an alert that was firing dismisses when margin recovers above threshold
+- [ ] **Waterfall chart:** Tested with a loss order (negative net profit) — bars render correctly
+- [ ] **Waterfall chart:** Tested with an order where `cogsTotal === null` — chart shows a placeholder segment, not NaN bars
+- [ ] **Waterfall chart:** Tested with a partial refund order — revenue segment reflects `revenueNet` (post-refund), not gross
+- [ ] **All new ad API routes:** `req.shopDomain` (from JWT) verified as owner of the `adAccountId` before any ad platform data is returned
 
 ---
 
-### Pitfall 18: Shopify Admin Session Token Expiry Causing Silent 401s in SPA
+## Recovery Strategies
 
-**What goes wrong:** App Bridge session tokens (JWTs) expire after 60 seconds. A React component fetches data on mount, then the merchant leaves the tab open for 5 minutes. When the merchant interacts again, the next API call uses a stale token. The Express backend returns 401. The React component shows a blank/error state with no recovery mechanism. The merchant thinks the app crashed.
-
-**Prevention:**
-- Always call `shopify.idToken()` immediately before each API request — App Bridge will return a cached token or refresh it automatically.
-- Do not cache the session token in React component state or local storage.
-- Handle 401 responses from the Express backend by re-fetching a fresh token and retrying once before showing an error.
-
-**Warning signs:** Session token fetched once on component mount and stored in `useState`. No retry logic on 401 responses.
-
-**Phase:** When React frontend + API calls are introduced.
-
----
-
-## Minor Pitfalls
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| Fee data corrupted by REFUND transaction writeback | MEDIUM | Re-run `syncPayouts` with CHARGE-only filter — all `feesTotal` values overwrite idempotently; no manual data correction needed |
+| Ad tokens stored plaintext discovered post-ship | HIGH | Add encryption migration: read all existing tokens, encrypt, re-write; rotate `ENCRYPTION_KEY`; ask merchants to reconnect as a precaution (can use token validity check to determine urgency) |
+| Meta tokens expired for all early adopters simultaneously | MEDIUM | Deploy reconnect banner; tokens can be refreshed without full re-auth if not past hard expiry; triage by `tokenExpiresAt` and prompt batches |
+| Google developer token stuck at Test Account Access | LOW-MEDIUM | All development work on test accounts continues; production data simply not yet accessible; no code change required when approved |
+| Attribution model causes visible spend overcount; merchants complain | HIGH | Document and disclose the attribution model with a prominent label ("estimated — daily revenue-weighted apportionment"); offer campaign-level total spend view as a simpler alternative |
+| Alert fatigue — merchants have disabled alerts | MEDIUM | Add eligibility guards and frequency caps; re-enable with a "your alerts have been tuned — here's what changed" in-app message |
+| Waterfall chart renders incorrectly for loss orders | LOW | Server-side `[low, high]` tuple fix deployed; no data migration needed; chart renders from server-computed values |
 
 ---
 
-### Pitfall 19: Shopify's `inventory_item.cost` Field Is Not COGS
+## Pitfall-to-Phase Mapping
 
-**What goes wrong:** Shopify has a `cost` field on `inventory_items` (accessible via `GET /admin/api/inventory_items/{id}.json`). Developers assume this is what merchants use for COGS and skip building a COGS entry UI entirely. In practice, most merchants have never set this field, it represents landed cost (not fully-loaded COGS), and it's not variant-level accurate for most stores.
-
-**Prevention:**
-- Use `inventory_item.cost` as an optional default to pre-populate COGS fields in the UI, not as the sole source.
-- Always let merchants override/correct the value.
-- Document clearly: "We pre-filled this from your Shopify inventory cost. Adjust if this doesn't reflect your actual cost."
-
-**Phase:** Phase 1 MVP (COGS entry UI).
-
----
-
-### Pitfall 20: Shopify CLI `shopify app dev` Tunnel Creates a New URL on Every Start
-
-**What goes wrong:** `shopify app dev` uses a random tunnel URL (Cloudflare or ngrok) by default. Every time the developer restarts, the tunnel URL changes. The `SHOPIFY_APP_URL` env var becomes stale, OAuth redirect URLs in the Partners dashboard become invalid, and the app stops working locally until manually updated.
-
-**Prevention:**
-- Use `--tunnel-url` with a fixed ngrok or Cloudflare tunnel (requires a paid ngrok account for reserved subdomains).
-- Or: update `.env` and Partners dashboard redirect URLs automatically via `shopify app config push` after each URL change.
-- Consider using a staging environment on Railway for integration testing rather than local tunnels.
-
-**Phase:** Development workflow (applies throughout all phases).
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| REFUND transaction fee writeback | FEE-FIX-01 | Diagnostic log reviewed on live store; only CHARGE type rows produce non-zero fees |
+| `associatedOrder` null not guarded | FEE-FIX-01 | Unit test: mock data with null-associatedOrder rows skipped without error |
+| `fee` vs `fees` field path ambiguity | FEE-FIX-01 | Live API query response inspected; field name confirmed against 2025-10 schema |
+| OAuth popup blocked in iframe | ADS-01 (Meta OAuth) | Connect flow tested inside actual Shopify Admin iframe; tested in Safari |
+| Ad tokens stored plaintext | ADS-01 (Meta OAuth) | Schema review: `encryptedAccessToken` column present; `ENCRYPTION_KEY` in Railway config |
+| Meta attribution window double-counting | ADS-03 (Attribution model) | Attribution model documented before code; total attributed spend audited against billed amount |
+| Google developer token approval delay | Pre-ADS-02 (apply during ADS-01) | Developer token status confirmed as prerequisite before ADS-02 kickoff |
+| Meta token expiry silent failure | ADS-01 (Meta OAuth) | `tokenExpiresAt` in schema; sync test with expired token mock returns reconnect state |
+| Google timezone mismatch in spend data | ADS-02 (Google Ads OAuth) | Date range queries use account timezone; stored values normalized to UTC |
+| Alert fatigue from immediate firing | ALERT-01 (Margin alerts) | Eligibility criteria (7 days, 3 orders, cogsKnown) verified in alert query |
+| Alerts never auto-dismiss | ALERT-01 (Margin alerts) | Resolved alert disappears after margin recovery — tested manually |
+| Waterfall NaN on null COGS | CHART-01 (Waterfall chart) | Test fixture with `cogsTotal: null` renders placeholder bar, not NaN |
+| Waterfall incorrect for loss orders | CHART-01 (Waterfall chart) | Test fixture with negative net profit renders bars at correct Y positions |
+| CSP blocks ad platform calls from frontend | ADS-01 + ADS-02 | Grep for `graph.facebook.com` or `googleads.googleapis.com` in frontend code confirms zero direct calls |
 
 ---
 
-### Pitfall 21: Forgetting That Shopify Draft Orders Are Included in the Orders Endpoint
+## Carried-Forward Pitfalls from v1.0 (Still Relevant)
 
-**What goes wrong:** `GET /admin/api/orders.json` by default only returns open orders, but `status=any` (which is needed for historical profit) also returns draft orders. Draft orders are not real revenue. Including them in profit calculations inflates revenue significantly for stores that use drafts heavily.
+These pitfalls were identified and largely addressed in v1.0. They remain relevant if features touch their surface area.
 
-**Prevention:**
-- Filter out `source_name === 'draft_orders'` or check `order.draft_order_id !== null` when syncing.
-- Alternatively, filter at the API level: only sync orders with `financial_status` in the paid states.
-
-**Phase:** Phase 1 MVP (order sync).
-
----
-
-## Phase-Specific Warnings
-
-| Phase Topic | Likely Pitfall | Mitigation |
-|-------------|---------------|------------|
-| Order sync (initial historical) | REST pagination cursor expiry; duplicate records | Use GraphQL Bulk Operations for initial sync; REST incremental for delta |
-| Order sync (rate limits) | 429 errors on large stores | Sequential paging with header-based throttling; per-shop queues |
-| Fee calculation | Plan-dependent rates hardcoded wrong | Fetch shop plan on install; store in ShopSession; config table for rate lookup |
-| Refund handling | Fee model not adjusted for refunds | Separate refund adjustment model; test with partial refund scenarios |
-| COGS data model | Product-level instead of variant-level | Schema must be `variant_id`-keyed from day 1 |
-| COGS display | NULL COGS silently treated as $0 | Three-state model; coverage percentage banner |
-| COGS history | Current COGS rewriting historical reports | Snapshot COGS at order sync time; time-series COGS table |
-| React frontend intro | CSP missing `script-src`; blank screen | Update CSP directives; test in real embedded context |
-| React API auth | App Bridge JWT not validated on backend | `requireAppBridgeAuth` middleware on all `/api/*` routes |
-| Billing feature | Charge status not verified post-redirect | Query Shopify to confirm `active` status; billing gate middleware |
-| App review submission | 60+ scopes in TOML; GDPR stubs | Trim to minimum required scopes; implement GDPR handlers before submission |
-| Payout sync | Payout-to-order reconciliation attempt | Use payouts for cashflow only; use order-level rates for per-order profit |
+| Pitfall | v1.0 Status | v2.0 Risk |
+|---------|-------------|-----------|
+| REST pagination cursor expiry on historical sync | Mitigated — using GraphQL Bulk Operations | Low — no new historical syncs planned |
+| REST 429 rate limits on large stores | Mitigated — incremental sync with header-based throttling | Medium — ad spend sync adds new API call volume |
+| Third-party fee rate hardcoded (plan not detected) | Fixed — plan stored in ShopConfig | Low — fee engine already handles this |
+| REFUND fee model not adjusted | Partially mitigated — proportional COGS adjustment exists | Medium — FEE-FIX-01 may surface edge cases |
+| NULL COGS silently treated as zero | Fixed — null propagation throughout data model | Low — waterfall chart must respect this (CHART-01) |
+| COGS time-series not snapshot | Fixed — insert-only ProductCost table | Low — no change to COGS model planned |
+| App Bridge JWT not validated on backend | Fixed — `verifySessionToken` middleware on all `/api/*` routes | Low — new routes must use the same middleware |
+| CSP `frame-ancestors` breaking with new scripts | Mitigated — CSP set correctly | Medium — Meta/Google OAuth redirect changes the frame navigation pattern |
+| GDPR webhook stubs | Fixed — real DB operations implemented in v1.0 | Low — ad connection data must be included in `shop/redact` handler |
 
 ---
 
 ## Sources
 
-**Confidence levels applied:**
+- [ShopifyPaymentsBalanceTransaction — GraphQL Admin API](https://shopify.dev/docs/api/admin-graphql/latest/objects/ShopifyPaymentsBalanceTransaction)
+- [New fees and net fields for balance transactions — Shopify Developer Changelog (2025-04)](https://shopify.dev/changelog/new-fees-and-net-fields-for-balance-transactions)
+- [associatedOrder null for SHOPIFY_COLLECTIVE_CREDIT — Shopify Dev Community](https://community.shopify.dev/t/graphql-balancetransactions-associatedorder-is-null-for-shopify-collective-credit-type-despite-ui-showing-order-link/13734) — fix shipped API 2025-7
+- [Set up embedded app authorization — Shopify.dev](https://shopify.dev/docs/apps/build/authentication-authorization/set-embedded-app-authorization?extension=javascript)
+- [Set up iframe protection — Shopify.dev](https://shopify.dev/docs/apps/build/security/set-up-iframe-protection)
+- [Marketing API Rate Limiting — Meta for Developers](https://developers.facebook.com/docs/marketing-api/overview/rate-limiting/)
+- [Access Token Guide — Meta for Developers](https://developers.facebook.com/docs/facebook-login/guides/access-tokens/)
+- [Meta Ads Attribution Window changes June 2025 — Windsor.ai](https://windsor.ai/documentation/facebook-ads-meta-api-updates-june-10-2025/)
+- [Meta Ads Attribution Window Removed January 2026 — Dataslayer](https://www.dataslayer.ai/blog/meta-ads-attribution-window-removed-january-2026)
+- [Currency Mismatch Warning in Meta Conversion API — Elevar](https://docs.getelevar.com/docs/currency-mismatch-warning-in-facebook-conversion-api-capi)
+- [Rate Limits — Google Ads API](https://developers.google.com/google-ads/api/docs/productionize/rate-limits)
+- [Developer Token — Google Ads API](https://developers.google.com/google-ads/api/docs/api-policy/developer-token)
+- [Google Ads API developer token access applications update — Google Ads Developer Blog, Feb 2026](https://ads-developers.googleblog.com/2026/02/an-update-on-google-ads-api-developer.html)
+- [OAuth 2.0 for Google Ads API — Google for Developers](https://developers.google.com/google-ads/api/docs/oauth/overview)
+- [Upcoming security changes to Google OAuth in embedded webviews — Google Developers Blog](https://developers.googleblog.com/upcoming-security-changes-to-googles-oauth-20-authorization-endpoint-in-embedded-webviews/)
+- [Recharts waterfall chart issue #2267](https://github.com/recharts/recharts/issues/2267)
+- [Recharts native waterfall support feature request #7010](https://github.com/recharts/recharts/issues/7010)
+- [Recharts negative values bar chart issue #1427](https://github.com/recharts/recharts/issues/1427)
+- [Recharts waterfall tutorial — 2359media/Medium](https://medium.com/2359media/tutorial-how-to-create-a-waterfall-chart-in-recharts-15a0e980d4b)
 
-- Shopify REST/GraphQL rate limits, pagination mechanics, order/transaction object structure: HIGH — based on stable, well-documented Shopify API behavior (current as of API version 2025-10 used by this project)
-- Fee structures by Shopify plan (transaction fees + processing rates): HIGH — publicly documented on Shopify's pricing page; these rates change very infrequently
-- Refund fee behavior (processing fee recouped vs. not): MEDIUM — documented in Shopify Help Center; processor-specific behavior may vary
-- App Bridge 4.x session token flow and CSP requirements: HIGH — App Bridge 4.x has been stable and its documentation is authoritative
-- Billing API charge status flow: HIGH — well-documented and a common source of developer errors in Shopify community forums
-- App review rejection patterns (GDPR stubs, scope over-requesting): HIGH — Shopify's review guidelines explicitly call these out; GDPR webhook testing confirmed in review documentation
-- COGS historical snapshot requirement: MEDIUM — derived from general analytics/accounting best practices; not a Shopify-specific documented requirement but a clear correctness requirement
-- `inventory_item.cost` limitations: HIGH — field exists and is documented; the "merchants don't use it" observation is MEDIUM (community knowledge)
-
-**Note:** WebSearch and WebFetch were unavailable in this research session. All findings are drawn from training knowledge through August 2025 covering Shopify API documentation, developer community patterns, and common implementation pitfalls. Claims about Shopify fee rates and API behavior are based on documented, stable platform characteristics. Recommend verifying current fee tiers against Shopify's live pricing page before shipping fee calculation logic.
+---
+*Pitfalls research for: Shopify Embedded Profit Analytics App — v2.0 payout fee fix, waterfall chart, margin alerts, Meta Ads OAuth, Google Ads OAuth, ad spend attribution*
+*Researched: 2026-03-18*

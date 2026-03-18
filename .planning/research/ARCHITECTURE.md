@@ -1,673 +1,873 @@
-# Architecture Patterns: Profit Analytics on Shopify Embedded App
+# Architecture Research
 
-**Domain:** Shopify profit analytics dashboard (embedded app)
-**Researched:** 2026-03-10
-**Confidence:** MEDIUM-HIGH (Shopify API patterns based on training through Aug 2025; API version 2025-10 in use per existing toml config; external research tools unavailable, findings cross-checked against official Shopify documentation patterns from training)
+**Domain:** Shopify Profit Analytics — v2.0 Feature Integration
+**Researched:** 2026-03-18
+**Confidence:** HIGH (existing codebase read directly; OAuth CSP constraints verified against Shopify community + official docs; Meta/Google token lifecycle verified against official developer docs)
 
 ---
 
-## Recommended Architecture
+## Scope
 
-The new architecture layers a data pipeline and React dashboard on top of the existing Express/PostgreSQL/Shopify OAuth foundation. It introduces three new subsystems without replacing anything:
+This document is focused on how the five v2.0 features integrate with the existing v1.0 architecture. It does not re-document v1.0 components except where they are modified.
 
-1. **Data Ingestion Subsystem** — pulls orders from Shopify API, stores raw + computed records
-2. **Analytics API Subsystem** — Express routes serving aggregated profit data to the React frontend
-3. **React Frontend Subsystem** — Shopify App Bridge embedded React app replacing the current inline HTML
+**Features addressed:**
+1. Payout fee fix (FEE-FIX-01)
+2. Waterfall chart (CHART-01)
+3. Margin alerts (ALERT-01)
+4. Meta Ads integration (ADS-01)
+5. Google Ads integration (ADS-02 / ADS-03)
 
-These three subsystems connect to the existing Auth, Session, Webhook, and Prisma layers that are already working.
+---
+
+## System Overview (v2.0)
 
 ```
-[Shopify Admin]
-    |
-    | iframe (App Bridge)
-    v
-[React Frontend]  <-- GET /api/analytics/* --> [Analytics API Routes]
-                                                       |
-                                              [Prisma Data Access]
-                                                       |
-                                              [PostgreSQL: Order, Profit,
-                                               Product, COGS tables]
-                                                       ^
-                                                       |
-                                          [Background Sync Service]
-                                                       |
-                        +---------------------------+--+
-                        |                           |
-               [Shopify REST API]       [Shopify Webhook: orders/create,
-               /admin/api/orders.json   orders/updated, orders/paid]
-               /admin/api/products.json
-               /admin/api/payouts.json (GraphQL)
+┌─────────────────────────────────────────────────────────────────────┐
+│                     React SPA (web/src/)                             │
+│                                                                      │
+│  Overview  Orders  Products  [NEW] Ads  [NEW] AlertBanner           │
+│      │       │        │           │           │                      │
+│      └───────┴────────┴───────────┴───────────┘                     │
+│                        apiFetch (JWT Bearer)                         │
+└────────────────────────────────┬────────────────────────────────────┘
+                                 │ HTTPS
+┌────────────────────────────────▼────────────────────────────────────┐
+│                     Express server (server.js)                       │
+│                                                                      │
+│  /api/* → verifySessionToken → routes/api.js                        │
+│  [NEW] /auth/meta → routes/ads-auth.js (top-level redirect)         │
+│  [NEW] /auth/meta/callback → routes/ads-auth.js                     │
+│  [NEW] /auth/google → routes/ads-auth.js (top-level redirect)       │
+│  [NEW] /auth/google/callback → routes/ads-auth.js                   │
+│  /api/ads/* → routes/api.js (JWT-protected, new handlers)           │
+│                                                                      │
+│  scheduler.js → [EXTENDED] syncPayouts, syncAdSpend (new)           │
+└────────────────────────────────┬────────────────────────────────────┘
+                                 │ Prisma
+┌────────────────────────────────▼────────────────────────────────────┐
+│                       PostgreSQL (Prisma ORM)                        │
+│                                                                      │
+│  Existing: ShopSession, Order, LineItem, OrderProfit, ProductCost,  │
+│            ShopConfig, OAuthState                                    │
+│                                                                      │
+│  [NEW] AdConnection  — Meta/Google OAuth tokens per shop            │
+│  [NEW] AdSpend       — daily campaign spend, synced from Ads APIs   │
+│  ShopConfig [EXTENDED] — margin threshold alert config              │
+│  OAuthState [EXTENDED] — platform discriminator for ads OAuth       │
+└─────────────────────────────────────────────────────────────────────┘
+                         │                    │
+          ┌──────────────┘                    └────────────────┐
+          ▼                                                     ▼
+  Shopify Payments GraphQL                          Meta / Google Ads APIs
+  (balance transactions —                          (Insights / Reporting —
+   fee verification fix)                            daily spend per campaign)
 ```
 
 ---
 
-## Component Boundaries
+## Feature 1: Payout Fee Fix
 
-### Component 1: React Frontend (new)
+### Problem
 
-**Responsibility:** Render profit dashboard in Shopify Admin iframe using App Bridge. Show store overview, per-order profit, per-product margins. Handle COGS input form.
+`syncPayouts.js` currently fetches all balance transactions across all pages and writes the `fee` to `OrderProfit.feesTotal`. Two known open questions from v1.0:
+- The `transaction.fees` field path needs live verification against a real Shopify Payments store
+- The payout-to-order 1:1 mapping has not been confirmed in production
 
-**Communicates with:**
-- Shopify Admin via App Bridge 3.x (for session token, navigation, UI chrome)
-- Express API via REST (`/api/analytics/*`, `/api/cogs/*`) — authenticated via App Bridge session tokens
+The GraphQL field in the current query is `fee { amount }` on `ShopifyPaymentsBalanceTransaction`. Per official Shopify docs (verified), this field is `fee` of type `MoneyV2` — the field name is correct. The current code filters `type === 'CHARGE'` and sums multiple CHARGE transactions per order — this is correct behavior for split payments.
 
-**Does not:**
-- Directly call Shopify Admin API (all Shopify calls go through Express backend)
-- Hold computed profit state (server is source of truth)
+The key fix: currently the sync processes all balance transactions regardless of whether the associated payout has been finalized. Filtering to `payout_status:PAID` ensures only settled fees are written. The `payments_transfer_id` filter for fetching transactions by payout ID is confirmed available via community verification (not yet in official docs).
 
-**Build dependency:** Requires Analytics API routes to exist before the frontend is useful. Requires App Bridge session token middleware on the Express side.
+### What Changes
 
----
+**Modified: `lib/syncPayouts.js`**
 
-### Component 2: Analytics API Routes (new)
+- Add `query: "payout_status:PAID"` filter to `balanceTransactions` to only process finalized payouts
+- Add diagnostic logging that records the raw fee values seen per order on first run, enabling live verification
+- No schema changes needed — `OrderProfit.feesTotal` already stores this value
 
-**Responsibility:** Serve aggregated profit data to the React frontend. Validate session tokens. No Shopify API calls — reads only from the local PostgreSQL database.
+**Modified: `routes/api.js`**
 
-**Communicates with:**
-- React Frontend (inbound requests)
-- Prisma / PostgreSQL (database reads)
-- Existing Auth layer (session validation via `ShopSession` model)
+- `POST /api/sync/payouts` already exists — no route change needed
+- Add `GET /api/sync/payouts/status` returning last sync timestamp and fee coverage percentage (orders with non-zero feesTotal vs. total Shopify Payments orders) — useful for manual verification
 
-**Key routes:**
+### Data Flow
+
 ```
-GET  /api/analytics/overview?shop=&from=&to=     # Store-level profit summary
-GET  /api/analytics/orders?shop=&from=&to=&page= # Per-order profit list
-GET  /api/analytics/products?shop=&from=&to=     # Per-product margin list
-POST /api/cogs                                    # Create/update COGS entry
-GET  /api/cogs?shop=                             # List COGS entries
-POST /api/cogs/import                            # CSV bulk import
-GET  /api/sync/status?shop=                      # Sync status (last sync, count)
-POST /api/sync/trigger?shop=                     # Manual resync trigger
+POST /api/sync/payouts
+    ↓
+syncPayouts(prisma, shop, accessToken)
+    ↓
+shopifyPaymentsAccount.balanceTransactions
+  query: "payout_status:PAID"         ← add this filter
+  filter client-side: type === 'CHARGE'  ← already in place
+    ↓
+fee { amount } per associatedOrder.id
+    ↓
+OrderProfit.feesTotal = sum of fees per order  ← already in place, no change
 ```
 
-**Authentication:** Every request must be validated with an App Bridge session token (JWT). Middleware reads `Authorization: Bearer <session_token>` header, verifies the JWT signature using `SHOPIFY_API_SECRET`, extracts the shop domain, then checks `ShopSession` table for a valid access token.
+### Confidence Notes
 
-**Build dependency:** Requires Prisma schema (Order, OrderProfit, Product, COGS models) to be migrated before any routes return data.
-
----
-
-### Component 3: Background Sync Service (new)
-
-**Responsibility:** Pull orders and products from Shopify API into PostgreSQL. Run profit computations. Keep data fresh without blocking HTTP responses.
-
-**Communicates with:**
-- Shopify Admin REST API (outbound: orders, products, payouts)
-- Prisma / PostgreSQL (writes)
-- ShopSession table (reads: to get access token per shop)
-
-**Trigger mechanisms (in order of preference):**
-1. **Webhook-triggered** (primary): `orders/paid`, `orders/updated`, `orders/cancelled` → immediate upsert of single order
-2. **Polling fallback** (secondary): Scheduled job every 15 minutes per shop using `node-cron` — catches missed webhooks, handles bulk historical sync on install
-3. **Manual trigger** (tertiary): `POST /api/sync/trigger` — for user-initiated resync
-
-**Does not:**
-- Block the HTTP request cycle (runs in-process but asynchronously, or extracted to a worker later)
-- Compute profit in real-time during API requests (profit computed at sync time, stored)
-
-**Build dependency:** Requires ShopSession (exists), Order/Product Prisma models, COGS model (needed to compute profit at sync time).
+HIGH confidence on `fee` field name — confirmed in Shopify official docs.
+MEDIUM confidence on `payout_status:PAID` filter syntax — confirmed in Shopify developer community thread (https://community.shopify.dev/t/balance-transactions-by-payout-id/20934), not yet in official docs.
 
 ---
 
-### Component 4: Prisma Data Models (new, extending existing schema)
+## Feature 2: Waterfall Chart
 
-**Responsibility:** Store all profit-relevant data: raw order data, COGS per variant, computed profit per order and per product.
+### Problem
 
-**Communicates with:**
-- Background Sync (writes raw + computed data)
-- Analytics API Routes (reads aggregated data)
+The per-order profit breakdown data already exists in `OrderProfit` (revenueNet, cogsTotal, feesTotal, shippingCost, netProfit). The waterfall chart just needs a new API endpoint that structures this data for rendering, and a new React component.
 
-**Build dependency:** Must be built first — everything else depends on these models.
+### What Changes
 
----
+**New API endpoint in `routes/api.js`: `GET /api/dashboard/orders/:orderId/waterfall`**
 
-### Existing Components (unchanged boundaries)
+No schema change needed. The endpoint joins `Order` (for name and date) with `OrderProfit` (for all cost components) and returns a `bars` array shaped for Recharts.
 
-| Component | Role | Relevant to New Work |
-|-----------|------|----------------------|
-| Auth routes (`routes/auth.js`) | OAuth flow | Session token validation reuses `ShopSession` |
-| Webhook routes (`routes/webhooks.js`) | Lifecycle events | Add new order webhook handlers here |
-| Prisma client (`lib/prisma.js`) | DB singleton | Shared by new components |
-| ShopSession model | Per-shop access tokens | Background sync reads tokens from this |
-
----
-
-## Shopify API Strategy: GraphQL vs REST
-
-### Verdict: GraphQL for historical bulk sync, REST for incremental updates
-
-**Confidence:** MEDIUM (based on Shopify API documentation patterns through Aug 2025)
-
-**GraphQL Bulk Operations (for initial historical sync):**
-
-Shopify's `bulkOperationRunQuery` mutation lets you export all historical orders asynchronously. Shopify processes the job server-side and provides a JSONL download URL. This is the correct approach for syncing a store's full order history on install (could be 10,000+ orders).
-
-```graphql
-mutation {
-  bulkOperationRunQuery(
-    query: """
-    {
-      orders {
-        edges {
-          node {
-            id
-            name
-            createdAt
-            totalPriceSet { shopMoney { amount currencyCode } }
-            subtotalPriceSet { shopMoney { amount currencyCode } }
-            totalShippingPriceSet { shopMoney { amount currencyCode } }
-            totalTaxSet { shopMoney { amount currencyCode } }
-            lineItems {
-              edges {
-                node {
-                  id
-                  quantity
-                  variant { id sku }
-                  originalTotalSet { shopMoney { amount currencyCode } }
-                }
-              }
-            }
-            transactions {
-              gateway
-              kind
-              status
-              fees { flatFee { amount } rateFee percentageFee }
-            }
-          }
-        }
-      }
-    }
-    """
-  ) {
-    bulkOperation { id status }
-    userErrors { field message }
-  }
+Response shape:
+```json
+{
+  "orderId": "gid://shopify/Order/12345",
+  "orderName": "#1001",
+  "processedAt": "2026-03-15T10:00:00Z",
+  "bars": [
+    { "label": "Revenue",  "value": 120.00, "cumulative": 120.00, "type": "positive" },
+    { "label": "COGS",     "value": -45.00, "cumulative": 75.00,  "type": "negative" },
+    { "label": "Fees",     "value": -3.60,  "cumulative": 71.40,  "type": "negative" },
+    { "label": "Shipping", "value": -8.00,  "cumulative": 63.40,  "type": "negative" },
+    { "label": "Profit",   "value": 63.40,  "cumulative": 63.40,  "type": "total"    }
+  ],
+  "marginPct": 52.8,
+  "cogsKnown": true
 }
 ```
 
-The result is polled via `currentBulkOperation { status url }` and downloaded as JSONL. This avoids REST pagination (250 orders/page with rate limits) for bulk historical loads.
+The `cumulative` field carries the running total for the invisible offset bar in the waterfall stacking trick. This is computed server-side so the React component doesn't need to know the calculation logic.
 
-**REST API for incremental sync (ongoing):**
+Security note: must verify `op.shop === req.shopDomain` before returning data — orderId alone is not a sufficient authorization check.
 
-For day-to-day incremental syncing (catching up on orders since last sync), REST is simpler:
+**New React component: `web/src/components/WaterfallChart.jsx`**
+
+- Receives `orderId` prop, fetches the endpoint above
+- Renders via Recharts `ComposedChart` with two stacked bars per step: invisible offset bar + colored bar
+- Recharts is already in the project (used by `TrendChart.jsx`) — no new dependency
+
+**Modified: `web/src/components/OrdersTable.jsx`**
+
+- Add row click handler that sets `selectedOrderId` state
+- Render `<WaterfallChart orderId={selectedOrderId} />` below the selected row or in a panel
+
+### Data Flow
 
 ```
-GET /admin/api/2025-10/orders.json?status=any&updated_at_min={timestamp}&limit=250
+User clicks order row → selectedOrderId = orderId
+    ↓
+WaterfallChart mounts → apiFetch('/api/dashboard/orders/{id}/waterfall')
+    ↓
+GET /api/dashboard/orders/:orderId/waterfall
+  prisma.orderProfit.findUnique({ where: { orderId }, include: { order: true } })
+  verify op.shop === req.shopDomain
+  build bars array with cumulative offsets
+    ↓
+Recharts ComposedChart renders waterfall
 ```
 
-REST returns 250 orders per page with `Link` header pagination. For stores doing $10K-$200K/month (roughly 50-2,000 orders/month), this means 1-8 pages — fast and simple. GraphQL cursors add complexity without benefit at this scale.
+### No Schema Changes Needed
 
-**Summary:**
-- Install sync (full history): GraphQL Bulk Operations
-- Ongoing incremental sync: REST API with `updated_at_min` filter
-- Single-order webhook sync: REST `GET /admin/api/2025-10/orders/{id}.json`
+All required data is in existing `OrderProfit` and `Order` tables.
 
 ---
 
-## Key Shopify API Endpoints
+## Feature 3: Margin Alerts
 
-**Confidence:** HIGH for REST; MEDIUM for specific GraphQL field names (verify against 2025-10 schema)
+### Problem
 
-### Orders with Line Items
-```
-GET /admin/api/2025-10/orders.json
-  ?status=any
-  &updated_at_min=2024-01-01T00:00:00Z
-  &limit=250
-  &fields=id,name,created_at,financial_status,line_items,total_price,subtotal_price,
-          total_shipping_price_set,total_tax,total_discounts,gateway,
-          payment_gateway_names,processing_method
-```
+Margin alerts need three things:
+1. Per-shop threshold config stored persistently
+2. Alert evaluation logic (identify products below threshold)
+3. UI surface (when/where alerts are shown)
 
-Line items include: `variant_id`, `sku`, `quantity`, `price`, `total_discount`
+### Schema Change: Extend `ShopConfig`
 
-### Transaction Fees
-Shopify transaction fees are NOT returned directly on the `Order` resource in REST. Options:
-
-1. **`/admin/api/2025-10/orders/{id}/transactions.json`** — returns payment gateway and amount, but NOT the fee percentage. Gateway name is present, allowing fee calculation from known rates.
-2. **Shopify Payments: Payouts API (GraphQL)** — `shopifyPaymentsPayout` and `payoutTransactions` include actual fee amounts per transaction. This is the authoritative source for Shopify Payments merchants.
-3. **Fee calculation fallback** — For non-Shopify-Payments merchants, calculate from known gateway rates (Shopify Basic: 2%, Shopify: 1%, Advanced: 0.5%; third-party gateways vary).
-
-**Recommended approach for MVP:**
-- Detect `payment_gateway_names` on the order
-- If `shopify_payments`: use the Payouts GraphQL API for exact fees
-- If third-party gateway: apply configurable fee rate (user-entered or known defaults)
-
-### Products / Variants for Cost Tracking
-```
-GET /admin/api/2025-10/products.json?fields=id,title,variants
-GET /admin/api/2025-10/variants/{id}.json
-```
-
-Shopify's `cost` field on variants (`inventory_item.cost`) is available via:
-```
-GET /admin/api/2025-10/inventory_items/{id}.json
-```
-Returns `cost` (merchant's purchase cost). This is the closest Shopify has to COGS for variants — use it as a starting point, allow merchant override.
-
-**Required scopes** (already configured per INTEGRATIONS.md with 60+ scopes):
-- `read_orders`, `read_products`, `read_inventory` — for order/product/cost data
-- `read_shopify_payments_payouts` — for exact fee data (confirm scope name in toml)
-
----
-
-## Database Schema Design
-
-### Strategy: Computed-and-Stored (not compute-on-the-fly)
-
-**Confidence:** HIGH (standard pattern for analytics systems)
-
-**Rationale:** Profit calculation requires joining orders + line items + COGS + fee data. Computing this on every dashboard request is expensive and slow. Store the computed profit per order at sync time. Recompute only when COGS change (triggered recompute job) or order updates arrive.
-
-This also means the dashboard API routes are simple read queries — no heavy computation at request time.
-
-### Prisma Schema Extensions
+Adding two columns to the existing `ShopConfig` model is simpler than a new table — `ShopConfig` is already the per-shop settings record and uses the same shop-scoped upsert pattern.
 
 ```prisma
-// Extend existing schema.prisma
+// Add to ShopConfig model:
+marginThresholdPct Decimal? @map("margin_threshold_pct") @db.Decimal(6, 2)  // null = alerts disabled
+alertsEnabled      Boolean  @default(false) @map("alerts_enabled")
+```
 
-model Order {
-  id               String   @id              // Shopify order GID or numeric ID
-  shopDomain       String                    // Isolates per-shop
-  shopifyOrderId   String                    // Shopify internal ID
-  orderName        String                    // "#1001" display name
-  createdAt        DateTime
-  updatedAt        DateTime
-  financialStatus  String                    // "paid", "refunded", "partially_refunded"
-  gateway          String                    // "shopify_payments", "paypal", etc.
+### New API Endpoints in `routes/api.js`
 
-  // Financials (stored in shop currency)
-  totalRevenue     Decimal  @db.Decimal(10,2)
-  subtotal         Decimal  @db.Decimal(10,2)
-  totalShipping    Decimal  @db.Decimal(10,2)
-  totalTax         Decimal  @db.Decimal(10,2)
-  totalDiscounts   Decimal  @db.Decimal(10,2)
+`GET /api/alerts` — evaluate and return current alerts:
 
-  // Computed profit (updated at sync time)
-  transactionFees  Decimal  @db.Decimal(10,2)  // From Shopify Payments API or calculated
-  totalCOGS        Decimal  @db.Decimal(10,2)  // Sum of (line item qty * variant COGS)
-  grossProfit      Decimal  @db.Decimal(10,2)  // revenue - COGS - fees - shipping
-  profitMargin     Decimal  @db.Decimal(5,4)   // grossProfit / totalRevenue (0.0-1.0)
-
-  lineItems        LineItem[]
-  syncedAt         DateTime                    // When this record was last synced
-
-  @@unique([shopDomain, shopifyOrderId])
-  @@index([shopDomain, createdAt])            // Primary query pattern
-  @@index([shopDomain, financialStatus])
-}
-
-model LineItem {
-  id              String   @id @default(cuid())
-  orderId         String
-  order           Order    @relation(fields: [orderId], references: [id])
-  shopifyLineId   String
-  variantId       String?
-  sku             String?
-  title           String
-  quantity        Int
-  unitPrice       Decimal  @db.Decimal(10,2)
-  totalPrice      Decimal  @db.Decimal(10,2)
-  unitCOGS        Decimal  @db.Decimal(10,2)  // Snapshot of COGS at sync time
-  totalCOGS       Decimal  @db.Decimal(10,2)  // quantity * unitCOGS
-
-  @@index([orderId])
-  @@index([variantId])
-}
-
-model Product {
-  id             String   @id              // Shopify product GID
-  shopDomain     String
-  title          String
-  syncedAt       DateTime
-  variants       ProductVariant[]
-
-  @@unique([shopDomain, id])
-  @@index([shopDomain])
-}
-
-model ProductVariant {
-  id              String   @id              // Shopify variant GID
-  productId       String
-  product         Product  @relation(fields: [productId], references: [id])
-  shopDomain      String
-  sku             String?
-  title           String                    // "Red / Large"
-  shopifyCost     Decimal? @db.Decimal(10,2) // From inventory_items.cost (Shopify's stored cost)
-
-  cogs            COGS?
-
-  @@index([shopDomain])
-  @@index([sku])
-}
-
-model COGS {
-  id              String   @id @default(cuid())
-  variantId       String   @unique
-  variant         ProductVariant @relation(fields: [variantId], references: [id])
-  shopDomain      String
-  cost            Decimal  @db.Decimal(10,2)  // Merchant-entered COGS (overrides shopifyCost)
-  source          String                       // "manual", "csv_import", "shopify_cost"
-  updatedAt       DateTime @updatedAt
-
-  @@index([shopDomain])
-}
-
-model SyncState {
-  id              String   @id @default(cuid())
-  shopDomain      String   @unique
-  lastOrderSync   DateTime?
-  lastProductSync DateTime?
-  syncStatus      String    // "idle", "running", "failed"
-  errorMessage    String?
-  totalOrders     Int       @default(0)
-  updatedAt       DateTime  @updatedAt
+```json
+{
+  "alerts": [
+    {
+      "type": "low_margin_product",
+      "variantId": "gid://shopify/ProductVariant/123",
+      "productName": "Widget Blue",
+      "sku": "WB-001",
+      "marginPct": 4.2,
+      "thresholdPct": 15.0,
+      "orderCount": 12
+    }
+  ],
+  "thresholdPct": 15.0,
+  "alertsEnabled": true,
+  "evaluatedAt": "2026-03-18T10:00:00Z"
 }
 ```
 
-### Key design decisions:
+Evaluation logic: re-run a variant of the existing `/api/dashboard/products` query (already a `$queryRaw`), filter for `marginPct < thresholdPct` over the last 30 days. The query is fast because `order_profits` and `line_items` are already indexed on `shop`.
 
-**Snapshot COGS on line items at sync time:** `LineItem.unitCOGS` stores the COGS value at the time the order was synced. This prevents retroactive COGS changes from silently altering historical profit numbers. When a merchant changes COGS, a recompute job runs and updates affected orders explicitly.
+`PUT /api/alerts/config` — update threshold settings:
+```json
+{ "thresholdPct": 15.0, "alertsEnabled": true }
+```
 
-**Store profit on Order, not compute in query:** `Order.grossProfit` and `Order.profitMargin` are pre-computed. Dashboard queries are simple `WHERE shopDomain = ? AND createdAt BETWEEN ? AND ?` with aggregates over stored values — no JOINs to COGS at query time.
+### UI Integration
 
-**`SyncState` per shop:** Tracks last sync cursor so incremental polling knows the `updated_at_min` parameter to use. Also surfaces sync status to the dashboard UI.
+**Modified: `web/src/App.jsx`**
+
+- Fetch `/api/alerts` on mount (alongside the existing health check)
+- If `alerts.length > 0 && alertsEnabled`, pass alerts to a new `AlertBanner` component
+
+**New: `web/src/components/AlertBanner.jsx`**
+
+- Dismissable banner at top of page
+- Shows: "X products below {threshold}% margin — view Products tab"
+- Dismiss stores to `localStorage` keyed by alert count + threshold — resets when new alerts appear
+
+**Modified: `web/src/components/ProductsTable.jsx`**
+
+- Add threshold config control (input + save) calling `PUT /api/alerts/config`
+- Visually highlight low-margin rows (conditional CSS class on rows below threshold)
+
+### Data Flow
+
+```
+App mounts → apiFetch('/api/alerts')
+    ↓
+GET /api/alerts
+    ↓
+ShopConfig.marginThresholdPct check → evaluate $queryRaw products query
+    ↓
+Filter: marginPct < thresholdPct (last 30 days)
+    ↓
+Return alerts array + config metadata
+    ↓
+AlertBanner renders if alerts present + alertsEnabled
+```
+
+### Performance Note
+
+Alert evaluation re-runs the products aggregation query on every page load. Acceptable at current scale (most target stores have fewer than 10K orders/month). The query has a 30-day fixed window, uses existing indexes, and is the same query already used by the Products tab. No caching layer needed for v2.0.
 
 ---
 
-## Background Sync Strategy
+## Features 4 & 5: Meta Ads + Google Ads Integration
 
-### Confidence: HIGH (standard Shopify app patterns)
+These two features share infrastructure. They are documented together.
 
-### Primary: Webhook-Driven Order Sync
+### Core Architectural Challenge: OAuth in Embedded Context
 
-Register these webhooks in `shopify.app.profit-tracker.toml`:
+**Constraint (HIGH confidence — verified against Shopify developer community 2026 + official docs):**
 
+The Shopify Admin embeds the app in an iframe. Third-party OAuth providers (Meta, Google) set `X-Frame-Options: DENY` on their authorization pages — OAuth cannot complete inside the iframe. Popup windows (`window.open`) are also unreliable: the Shopify Admin shell intercepts navigation and "reclaims" popup windows, preventing reliable auto-closure. This behavior is documented and acknowledged by Shopify engineers (source: community.shopify.dev/t/shopify-oauth-popup-cannot-auto-close/28862).
+
+**Recommended solution: top-level full-page redirect via `window.top.location.href`**
+
+This is the same pattern already used in the existing codebase. `routes/auth.js` already uses `form.target = '_top'` to break out of the iframe for Shopify OAuth. The billing confirmation URL redirect in `server.js` uses the same approach. Ads OAuth follows the identical pattern.
+
+Flow:
+1. User clicks "Connect Meta Ads" button in the embedded UI
+2. Frontend calls `GET /api/ads/meta/connect` which returns `{ redirectUrl: '/auth/meta?shop=...' }`
+3. Frontend sets `window.top.location.href = redirectUrl` — escapes the Shopify iframe
+4. `/auth/meta` (server-side) generates CSRF state, redirects to Meta OAuth URL
+5. Meta redirects to `/auth/meta/callback?code=...&state=...`
+6. Callback exchanges code for long-lived token, stores in `AdConnection`, redirects to `/admin?shop=...&view=ads`
+7. React SPA resumes in ads view showing "Connected" status
+
+Google follows the identical pattern with `/auth/google` and `/auth/google/callback`.
+
+### Schema Change: `AdConnection` Model (new)
+
+```prisma
+model AdConnection {
+  id             Int       @id @default(autoincrement())
+  shop           String
+  platform       String    // 'meta' | 'google'
+  accessToken    String    @map("access_token")
+  refreshToken   String?   @map("refresh_token")        // Google only
+  tokenExpiresAt DateTime? @map("token_expires_at")     // null = non-expiring (Meta Standard access)
+  adAccountId    String?   @map("ad_account_id")        // Meta: act_XXXXX, Google: customer ID
+  accountName    String?   @map("account_name")         // display name for UI
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@unique([shop, platform])   // one connection per platform per shop
+  @@index([shop])
+  @@map("ad_connections")
+}
 ```
-orders/paid       → POST /webhooks/orders/paid
-orders/updated    → POST /webhooks/orders/updated
-orders/cancelled  → POST /webhooks/orders/cancelled
-orders/refunded   → POST /webhooks/orders/refunded
+
+### Schema Change: `AdSpend` Model (new)
+
+```prisma
+model AdSpend {
+  id           Int      @id @default(autoincrement())
+  shop         String
+  platform     String   // 'meta' | 'google'
+  campaignId   String   @map("campaign_id")
+  campaignName String?  @map("campaign_name")
+  date         DateTime @db.Date   // day granularity
+  spend        Decimal  @db.Decimal(12, 2)
+  impressions  Int?
+  clicks       Int?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([shop, platform, campaignId, date])  // idempotency key for upsert
+  @@index([shop, platform, date])
+  @@map("ad_spends")
+}
 ```
 
-Each webhook handler:
-1. Verifies HMAC signature (existing pattern from `routes/webhooks.js`)
-2. Extracts order ID from payload
-3. Fetches full order from REST API (webhook payloads can be incomplete)
-4. Computes profit (fetch variant COGS from DB or Shopify inventory API)
-5. Upserts `Order` and `LineItem` records
-6. Updates `SyncState.lastOrderSync`
+### Schema Change: Extend `OAuthState`
 
-**Why fetch full order instead of using webhook payload:** Webhook payloads for `orders/updated` are partial — they only include changed fields. Fetching the full order ensures consistent data. This is the standard Shopify pattern.
+Reuse the existing `OAuthState` model for ads OAuth CSRF state. Add a `platform` discriminator rather than creating a parallel table.
 
-### Secondary: Polling for Incremental Sync
-
-A `node-cron` job runs every 15 minutes per active shop:
-
-```
-GET /admin/api/2025-10/orders.json?updated_at_min={SyncState.lastOrderSync}&status=any&limit=250
+```prisma
+// Add to OAuthState model:
+platform String?  // null = Shopify install, 'meta' | 'google' = ads OAuth
 ```
 
-Catches:
-- Orders that came in while webhooks were down
-- Webhook delivery failures (Shopify retries 3x over 48h, but gaps can happen)
-- Historical orders during bulk install sync
+### New File: `routes/ads-auth.js`
 
-**Cadence:** 15 minutes is appropriate for profit analytics — merchants don't need second-level freshness. This also keeps Shopify API usage well within rate limits (40 REST calls/second for most plans).
-
-### Historical Sync on Install
-
-On OAuth completion (after `ShopSession` is created), trigger a one-time historical sync job:
-
-1. Fetch all products and variants (for COGS seeding from `inventory_items.cost`)
-2. Use GraphQL Bulk Operations for order history (preferred) OR paginate REST orders with no `updated_at_min` filter (simpler, adequate for stores < 5,000 orders)
-3. For MVP: Use REST pagination (simpler to build). Upgrade to Bulk Operations in Phase 2 if large stores become target customers.
-4. Show sync progress in dashboard via `SyncState` polling (`GET /api/sync/status`)
-
-**Rate limit handling:** Use a simple exponential backoff. Shopify returns `429 Too Many Requests` with `Retry-After` header. Parse the header, sleep the specified time, retry. For REST: bucket of 40 calls/s (standard) or 2 calls/s (if on Basic plan). Implement token bucket at the sync service level.
-
----
-
-## Express Route Structure for Analytics API
-
-### Pattern: Shop-scoped REST with session token auth middleware
-
-All new routes go in `routes/api.js` (new file), registered in `server.js` as:
+Handles OAuth initiation and callbacks for both platforms. Registered in `server.js` as a top-level router (not under `/api` — no JWT needed since these routes are accessed from the full-page window, not the embedded app).
 
 ```javascript
-app.use('/api', apiSessionMiddleware, apiRouter);
+// routes/ads-auth.js key routes:
+GET  /auth/meta           → CSRF state → redirect to Meta OAuth URL
+GET  /auth/meta/callback  → verify state, exchange code, store AdConnection, redirect /admin
+GET  /api/ads/meta/connect  → returns { redirectUrl } for frontend to use with window.top
+GET  /auth/google         → CSRF state → redirect to Google OAuth URL (access_type=offline)
+GET  /auth/google/callback → verify state, exchange code+refresh tokens, store AdConnection, redirect /admin
+GET  /api/ads/google/connect → returns { redirectUrl }
+DELETE /api/ads/:platform/disconnect → JWT-protected, marks AdConnection.isActive=false
 ```
 
-`apiSessionMiddleware` validates the App Bridge session token JWT on every request, extracts the shop domain, and attaches it to `req.shop`. This is the Shopify-recommended pattern for embedded app API calls.
+The `/api/ads/*/connect` endpoints are JWT-protected (under `/api`) since they are called from within the embedded app. The `/auth/meta` and `/auth/google` callback routes are NOT under `/api` and have no JWT requirement — they arrive from external redirects.
 
-**App Bridge Session Token Flow:**
-1. React frontend calls `getSessionToken()` from `@shopify/app-bridge-react`
-2. Token is a short-lived JWT (1 min TTL) signed with `SHOPIFY_API_SECRET`
-3. Frontend passes token as `Authorization: Bearer <token>` header
-4. Express middleware verifies JWT signature, extracts `dest` claim (shop domain)
-5. Middleware confirms `ShopSession` exists for that shop (active installation)
+### Token Lifecycle
 
-All analytics queries then use `req.shop` as the scoping key — no shop parameter trusted from query string for authenticated routes.
+**Meta tokens:**
 
-### Analytics Query Patterns
+Meta short-lived tokens (from OAuth code exchange) last ~1 hour. Exchange for a long-lived token immediately after the code exchange:
 
-The most important query (store overview):
-
-```sql
-SELECT
-  COUNT(*) as order_count,
-  SUM(total_revenue) as total_revenue,
-  SUM(total_cogs) as total_cogs,
-  SUM(transaction_fees) as total_fees,
-  SUM(gross_profit) as gross_profit,
-  AVG(profit_margin) as avg_margin
-FROM orders
-WHERE shop_domain = $1
-  AND created_at BETWEEN $2 AND $3
-  AND financial_status NOT IN ('refunded', 'voided')
+```
+POST https://graph.facebook.com/v21.0/oauth/access_token
+  ?grant_type=fb_exchange_token
+  &client_id={META_APP_ID}
+  &client_secret={META_APP_SECRET}
+  &fb_exchange_token={short_lived_token}
 ```
 
-Because profit is pre-computed and stored on `Order`, this is a single-table aggregate — fast even at 10,000+ orders per shop.
+Apps with Standard Access to the Marketing API receive non-expiring long-lived tokens (confirmed via official Meta docs). Store with `tokenExpiresAt = null`. No refresh needed unless token is revoked. If a sync call returns `OAuthException` with code 190, mark `AdConnection.isActive = false` and surface re-connect prompt in UI.
+
+**Google tokens:**
+
+Exchange OAuth code with `access_type=offline` and `prompt=consent` to ensure a refresh token is returned. Access tokens expire in 1 hour. Before each `syncAdSpend` call:
+
+```javascript
+if (connection.tokenExpiresAt < Date.now() + 5 * 60 * 1000) {
+  // refresh: POST https://oauth2.googleapis.com/token with refresh_token
+  // update AdConnection.accessToken and tokenExpiresAt
+}
+```
+
+The refresh token does not expire (as long as the Google app is in production status, not test mode — test mode tokens expire in 7 days). Store refresh token in `AdConnection.refreshToken`.
+
+### New File: `lib/syncAdSpend.js`
+
+```
+syncAdSpend(prisma, shop)
+    ↓
+prisma.adConnection.findMany({ where: { shop, isActive: true } })
+    ↓
+For each connection:
+
+  if platform === 'meta':
+    GET https://graph.facebook.com/v21.0/act_{adAccountId}/insights
+      ?fields=campaign_id,campaign_name,spend,impressions,clicks
+      &time_range={"since":"YYYY-MM-DD","until":"YYYY-MM-DD"}
+      &level=campaign
+      &access_token={accessToken}
+    → AdSpend.upsert per campaign row
+
+  if platform === 'google':
+    check tokenExpiresAt → refresh if needed
+    Google Ads API GAQL (REST):
+      SELECT campaign.id, campaign.name,
+             metrics.cost_micros, metrics.impressions, metrics.clicks
+      FROM campaign
+      WHERE segments.date DURING YESTERDAY
+    → divide cost_micros by 1,000,000 to get dollars
+    → AdSpend.upsert per campaign row
+```
+
+Both platforms are handled in one file using a platform dispatch. The `AdSpend` schema's `@@unique([shop, platform, campaignId, date])` constraint makes upserts idempotent — safe to re-run.
+
+### Modified: `lib/scheduler.js`
+
+Extend the existing cron job to call `syncAdSpend` after `syncIncrementalOrders`. Must wrap in try/catch so a single shop's ads sync failure doesn't abort other shops.
+
+Ad spend is day-granularity, so skip if today's records already exist for this shop+platform (check before fetching from the external API to avoid unnecessary API calls).
+
+### Ad Spend Attribution to Orders
+
+**This is the hardest architectural decision in v2.0.**
+
+True per-order attribution requires capturing click IDs (fbclid, gclid) at checkout and storing them in order metafields. This requires front-end store modifications (pixel or web pixel app extension) which go beyond an embedded admin-only app and is out of scope for v2.0.
+
+Shopify's `CustomerJourneySummary` GraphQL object does expose attribution source data (verified via official docs — `customerJourneySummary.firstVisit` and `moments` contain UTM parameters and source). However, this data is only available for online store orders, only within a 30-day window, and not reliably populated for all orders. Fetching and storing this during order sync is possible but adds sync complexity for uncertain coverage.
+
+**Recommended v2.0 attribution model: campaign-level daily spend allocation (blended ROAS)**
+
+Attribute ad spend to the day's orders in aggregate. This is how competitors present data before pixel installation is complete.
+
+```
+Daily blended ROAS for a shop:
+  For each day in range:
+    total_ad_spend = SUM(AdSpend WHERE date = day AND shop = shop)
+    total_revenue  = SUM(OrderProfit.revenueNet WHERE order.processedAt::date = day)
+    daily_roas     = total_revenue / total_ad_spend
+    true_roas      = SUM(netProfit) / total_ad_spend
+```
+
+This is labeled explicitly in the UI as "Blended ROAS" to be honest about the attribution method. Per-campaign view shows spend per campaign vs. total store revenue — useful for budget allocation decisions even without per-order attribution.
+
+### New API Endpoints in `routes/api.js`
+
+`GET /api/dashboard/ads-overview?from=&to=`
+
+```json
+{
+  "from": "2026-02-18",
+  "to": "2026-03-18",
+  "connections": [
+    { "platform": "meta", "accountName": "My Store", "isActive": true },
+    { "platform": "google", "accountName": null, "isActive": false }
+  ],
+  "totalAdSpend": 1240.50,
+  "totalRevenue": 18400.00,
+  "blendedRoas": 14.83,
+  "totalNetProfit": 6200.00,
+  "trueRoas": 5.00,
+  "byCampaign": [
+    {
+      "platform": "meta",
+      "campaignId": "123456",
+      "campaignName": "Spring Sale",
+      "spend": 640.00,
+      "clicks": 1820,
+      "impressions": 42000
+    }
+  ],
+  "byDay": [
+    { "date": "2026-03-17", "adSpend": 42.00, "revenue": 620.00, "netProfit": 210.00 }
+  ]
+}
+```
+
+The `byDay` array joins `AdSpend` aggregate (GROUP BY date) with the existing trend query data. It's a SQL JOIN between two tables, both indexed on `(shop, date)`.
+
+### New React Component: `web/src/components/AdsOverview.jsx`
+
+- Connection status cards per platform with "Connect" / "Reconnect" / "Disconnect" buttons
+- Blended ROAS and True ROAS summary cards (labeled clearly as blended)
+- Daily spend vs. revenue line chart (extend `TrendChart.jsx` pattern with Recharts)
+- Campaign spend table sorted by spend DESC
+
+### Modified: `web/src/App.jsx`
+
+- Add `ads` to the TABS array
+- Fetch connection status on mount: `GET /api/dashboard/ads-overview?from=...&to=...`
+- Show Ads tab regardless of connection status (the tab content handles the "not connected" empty state)
+
+### New Required Environment Variables
+
+```
+META_APP_ID=
+META_APP_SECRET=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_ADS_DEVELOPER_TOKEN=
+```
+
+Add to Railway deployment config. Add to the `REQUIRED_ENV` check in `server.js` only if ads features are considered required — otherwise treat as optional and degrade gracefully (show "connect" prompt but don't crash if env vars are missing).
 
 ---
 
-## Data Flow
+## Component Map: New vs Modified
 
-### Install-Time Data Flow
+| Component | Status | Location | What Changes |
+|-----------|--------|----------|--------------|
+| `lib/syncPayouts.js` | MODIFIED | server | Add `payout_status:PAID` filter, diagnostic logging |
+| `routes/api.js` | MODIFIED | server | Waterfall endpoint, alerts endpoints, ads-overview endpoint, connect/disconnect endpoints |
+| `routes/ads-auth.js` | NEW | server | Meta + Google OAuth initiation and callbacks |
+| `lib/syncAdSpend.js` | NEW | server | Daily ad spend fetch from Meta/Google APIs with token refresh |
+| `lib/scheduler.js` | MODIFIED | server | Add `syncAdSpend` call per shop per tick |
+| `prisma/schema.prisma` | MODIFIED | db | Add `AdConnection`, `AdSpend`; extend `ShopConfig` (alerts); extend `OAuthState` (platform) |
+| `server.js` | MODIFIED | server | Register `routes/ads-auth.js`; add new env vars to validation |
+| `web/src/App.jsx` | MODIFIED | frontend | Add Ads tab, AlertBanner data fetch, ads connection check |
+| `web/src/components/WaterfallChart.jsx` | NEW | frontend | Per-order cost waterfall via Recharts |
+| `web/src/components/OrdersTable.jsx` | MODIFIED | frontend | Row click sets selectedOrderId, renders WaterfallChart |
+| `web/src/components/AlertBanner.jsx` | NEW | frontend | Dismissable low-margin alert banner |
+| `web/src/components/ProductsTable.jsx` | MODIFIED | frontend | Threshold config UI, low-margin row highlighting |
+| `web/src/components/AdsOverview.jsx` | NEW | frontend | Connection status, ROAS cards, campaign table, day chart |
 
-```
-OAuth completion
-  → trigger background job: historical order + product sync
-  → fetch all products + inventory_items.cost → upsert ProductVariant + COGS(source=shopify_cost)
-  → paginate REST orders (oldest first) → compute profit per order → upsert Order + LineItem
-  → update SyncState (lastOrderSync = now, totalOrders = N)
-  → React dashboard polls /api/sync/status every 5s until syncStatus = "idle"
-  → dashboard renders with data
-```
+---
 
-### Ongoing Order Data Flow
+## Schema Changes Summary
 
-```
-Shopify merchant places/updates order
-  → Shopify delivers webhook to POST /webhooks/orders/paid
-  → HMAC verified
-  → fetch full order from REST
-  → look up COGS for each variant in local DB
-  → compute profit (revenue - COGS - fees - shipping)
-  → upsert Order + LineItem records
-  → React dashboard next refresh shows updated data
-```
+All changes can go in one Prisma migration file.
 
-### COGS Update Data Flow
+```prisma
+// 1. Extend ShopConfig (margin alerts)
+model ShopConfig {
+  // ... existing fields unchanged ...
+  marginThresholdPct Decimal? @map("margin_threshold_pct") @db.Decimal(6, 2)
+  alertsEnabled      Boolean  @default(false) @map("alerts_enabled")
+}
 
-```
-Merchant enters COGS for variant via dashboard
-  → POST /api/cogs { variantId, cost }
-  → upsert COGS record
-  → trigger recompute job: find all orders containing this variant in date range
-  → recompute Order.totalCOGS and Order.grossProfit for affected orders
-  → React dashboard reflects updated margins
-```
+// 2. Extend OAuthState (ads OAuth CSRF)
+model OAuthState {
+  // ... existing fields unchanged ...
+  platform String?  // null = Shopify, 'meta' | 'google' = ads OAuth
+}
 
-### Dashboard Request Data Flow
+// 3. NEW: AdConnection — per-shop OAuth tokens for ad platforms
+model AdConnection {
+  id             Int       @id @default(autoincrement())
+  shop           String
+  platform       String    // 'meta' | 'google'
+  accessToken    String    @map("access_token")
+  refreshToken   String?   @map("refresh_token")
+  tokenExpiresAt DateTime? @map("token_expires_at")
+  adAccountId    String?   @map("ad_account_id")
+  accountName    String?   @map("account_name")
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
-```
-React app loads in Shopify Admin iframe
-  → App Bridge initializes, merchant authenticated by Shopify
-  → getSessionToken() returns JWT
-  → GET /api/analytics/overview?from=&to= with Bearer token
-  → apiSessionMiddleware validates JWT, extracts shop domain
-  → query Order table for pre-computed aggregates
-  → return JSON to React
-  → render dashboard
+  @@unique([shop, platform])
+  @@index([shop])
+  @@map("ad_connections")
+}
+
+// 4. NEW: AdSpend — daily campaign spend synced from Meta/Google
+model AdSpend {
+  id           Int      @id @default(autoincrement())
+  shop         String
+  platform     String
+  campaignId   String   @map("campaign_id")
+  campaignName String?  @map("campaign_name")
+  date         DateTime @db.Date
+  spend        Decimal  @db.Decimal(12, 2)
+  impressions  Int?
+  clicks       Int?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([shop, platform, campaignId, date])
+  @@index([shop, platform, date])
+  @@map("ad_spends")
+}
 ```
 
 ---
 
-## Patterns to Follow
+## Data Flows
 
-### Pattern 1: Pre-compute profit at write time, read at query time
+### Ads OAuth Flow (top-level redirect)
 
-**What:** When syncing an order, compute `grossProfit`, `profitMargin`, `transactionFees`, and `totalCOGS` immediately and store on the `Order` record.
+```
+User clicks "Connect Meta Ads" in embedded app
+    ↓
+apiFetch('/api/ads/meta/connect') → { redirectUrl: '/auth/meta?shop=...' }
+    ↓
+window.top.location.href = redirectUrl    ← escapes Shopify iframe
+    ↓
+GET /auth/meta?shop=...
+  generate state → OAuthState({ state, shop, platform: 'meta' })
+  redirect → https://www.facebook.com/v21.0/dialog/oauth
+               ?client_id={META_APP_ID}
+               &redirect_uri={APP_URL}/auth/meta/callback
+               &scope=ads_read,ads_management
+               &state={state}
+    ↓
+User approves on Meta (top-level browser window)
+    ↓
+GET /auth/meta/callback?code=...&state=...
+  verify state (OAuthState lookup, delete after use)
+  POST to Meta token endpoint → short-lived access token
+  POST to Meta token exchange endpoint → long-lived token (non-expiring for Standard access)
+  GET /me/adaccounts → fetch available ad accounts
+  AdConnection.upsert({ shop, platform: 'meta', accessToken, adAccountId, accountName })
+  redirect → /admin?shop=...&view=ads
+    ↓
+/admin serves React SPA → view=ads → AdsOverview shows "Connected"
+```
 
-**When:** Any time order data changes: initial sync, webhook update, COGS change.
+### Ad Spend Sync Flow
 
-**Why:** Dashboard API becomes a simple aggregate query. Avoids complex real-time joins across orders, line items, COGS, and fee tables. Scales to large order volumes without expensive query planning.
+```
+scheduler.js cron tick (every 15 min)
+    ↓
+syncAdSpend(prisma, shop) — wrapped in try/catch per shop
+    ↓
+Check: AdSpend exists for today + shop? → skip (idempotency gate)
+    ↓
+AdConnection.findMany({ shop, isActive: true })
+    ↓
+For platform='meta':
+  GET graph.facebook.com/v21.0/act_{adAccountId}/insights
+    fields: campaign_id, campaign_name, spend, impressions, clicks
+    time_range: yesterday
+    level: campaign
+  → AdSpend.upsert per row
 
-### Pattern 2: Webhook primary, polling backup
+For platform='google':
+  if tokenExpiresAt < now+5min: refresh access token
+  Google Ads API GAQL query for yesterday's campaign metrics
+  → convert cost_micros / 1,000,000
+  → AdSpend.upsert per row
+```
 
-**What:** Rely on `orders/paid` and `orders/updated` webhooks for real-time order ingestion. Run a 15-minute polling job as a reliability backstop.
+### Waterfall Chart Data Flow
 
-**When:** All production deployments.
+```
+User clicks order row in OrdersTable
+    ↓
+selectedOrderId state set → WaterfallChart mounts
+    ↓
+apiFetch('/api/dashboard/orders/{orderId}/waterfall')
+    ↓
+GET /api/dashboard/orders/:orderId/waterfall
+  prisma.orderProfit.findUnique({ where: { orderId }, include: { order: true } })
+  SECURITY: verify op.shop === req.shopDomain
+  build bars array with cumulative offsets
+    ↓
+WaterfallChart renders via Recharts ComposedChart
+```
 
-**Why:** Webhooks have ~99% delivery rate but not 100%. Polling catches the 1% with minimal API calls. Avoids needing a queuing system for MVP.
+### Margin Alert Evaluation Flow
 
-### Pattern 3: Shop-scoped everything
+```
+App mounts → apiFetch('/api/alerts')
+    ↓
+GET /api/alerts
+  ShopConfig.findFirst({ shop }) → get thresholdPct
+  if !alertsEnabled: return { alerts: [], alertsEnabled: false }
+  $queryRaw: variant-level margin query (last 30 days)
+  filter: marginPct < thresholdPct
+    ↓
+Return alerts array
+    ↓
+App passes to AlertBanner → renders if alerts.length > 0
+```
 
-**What:** Every database model includes `shopDomain`. Every query includes `WHERE shop_domain = ?`. Session token middleware enforces the shop boundary on every API request.
+---
 
-**When:** Every query, every model.
+## Architectural Patterns
 
-**Why:** Multi-tenancy is load-bearing. A bug that leaks one merchant's data to another is a fatal trust and legal failure. Defense in depth: scoping in DB schema + scoping in queries + session token validation.
+### Pattern 1: Top-Level Redirect for Third-Party OAuth
 
-### Pattern 4: Sync state as first-class citizen
+**What:** Escape the Shopify iframe by setting `window.top.location.href` to a server-side route that performs the redirect. On callback, redirect back to `/admin?shop=...&view=ads`.
 
-**What:** The `SyncState` model tracks sync status, last sync time, and error state per shop. The dashboard exposes this to merchants.
+**When to use:** Any time the app needs to authorize against an external service (Meta, Google, or future platforms) from within the embedded context.
 
-**When:** Every sync operation updates `SyncState`.
+**Trade-offs:** User briefly leaves Shopify Admin — unavoidable given iframe restrictions. The return redirect lands back in the embedded context correctly. This is the same pattern already used for Shopify OAuth and billing confirmation.
 
-**Why:** Merchants need to know if their data is current. "Data as of 10 minutes ago" is fine. "No idea if data is current" is a trust problem. Makes debugging easier in production.
+**Example:**
+```javascript
+// Frontend: escape the iframe
+const { redirectUrl } = await apiFetch('/api/ads/meta/connect');
+window.top.location.href = redirectUrl;
+
+// Backend: routes/ads-auth.js
+router.get('/auth/meta', async (req, res) => {
+  const { shop } = req.query;
+  const state = crypto.randomBytes(16).toString('hex');
+  await prisma.oAuthState.create({ data: { state, shop, platform: 'meta' } });
+  res.redirect(`https://www.facebook.com/v21.0/dialog/oauth?client_id=...`);
+});
+```
+
+### Pattern 2: Platform Dispatch in Shared Sync Module
+
+**What:** `syncAdSpend.js` handles both Meta and Google via a `platform` switch on the `AdConnection` record. A shared `AdConnection` model with a `platform` discriminator avoids duplicating token storage and refresh logic.
+
+**When to use:** When N platforms share the same data shape (campaign spend by day) but different API clients.
+
+**Trade-offs:** Platform-specific code paths in one file. Preferable to two separate files (`syncMetaAdSpend.js`, `syncGoogleAdSpend.js`) that would both need the same scheduler wiring and AdSpend upsert logic.
+
+### Pattern 3: Idempotent Upsert as Sync Safety Net
+
+**What:** Use Prisma `upsert` with the `@@unique` constraint as the idempotency key. Safe to re-run sync without producing duplicate records.
+
+**When to use:** `AdSpend` sync. Already used by `syncPayouts` (via direct update with P2025 error handling) and `syncOrders` (via Order upsert).
+
+### Pattern 4: Degrade Gracefully on Missing Ad Connections
+
+**What:** The Ads tab renders a "connect your account" empty state if no `AdConnection` exists for the shop. The scheduler's `syncAdSpend` is a no-op if `findMany` returns an empty array. No errors surfaced to unconnected shops.
+
+**When to use:** Any feature dependent on optional per-shop external credentials.
 
 ---
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Real-time profit computation on API request
+### Anti-Pattern 1: Mixing Ad Tokens into ShopSession
 
-**What:** Joining `Order → LineItem → COGS` on every dashboard GET request and computing profit in the query.
+**What people do:** Add `metaAccessToken`, `googleAccessToken` columns to `ShopSession`.
 
-**Why bad:** Becomes progressively slower as order volume grows. At 10,000 orders, a single date-range query joins 100,000+ line items against the COGS table. Dashboard becomes unusably slow for high-volume merchants.
+**Why it's wrong:** `ShopSession` is the Shopify install credential. Mixing ad platform credentials into it couples unrelated concerns, makes uninstall cleanup harder, and creates an ever-wider table as more platforms are added.
 
-**Instead:** Pre-compute profit at sync time. Store `grossProfit` on `Order`. Dashboard queries are single-table aggregates.
+**Do this instead:** Separate `AdConnection` table with `platform` discriminator. One row per shop per platform. Clean separation.
 
-### Anti-Pattern 2: Storing only raw Shopify data and computing everything in Express
+### Anti-Pattern 2: Client-Side Token Exchange
 
-**What:** Saving raw API JSON blobs to a `raw_orders` table and processing all analytics in Node.js at request time.
+**What people do:** Make the Meta/Google code-to-token exchange from the React app (browser).
 
-**Why bad:** You lose SQL's aggregation power. Moving large datasets through Node to compute SUM/AVG is slower than PostgreSQL doing it natively. Also makes date-range filtering expensive.
+**Why it's wrong:** The app secret would be visible in browser network inspector. Both Meta and Google explicitly require server-side exchanges. A merchant or attacker could extract the secret.
 
-**Instead:** Parse Shopify API responses at sync time, extract the fields you need, store in normalized relational tables, let PostgreSQL do aggregations.
+**Do this instead:** All OAuth code exchanges happen server-side in `routes/ads-auth.js`. Frontend only initiates the redirect and reads the final connection status.
 
-### Anti-Pattern 3: Polling Shopify API on every dashboard page load
+### Anti-Pattern 3: Labeling Blended ROAS as Per-Order Attribution
 
-**What:** Frontend calls backend, which calls Shopify Admin API, which returns orders, which are then processed and returned to frontend — all in-request.
+**What people do:** Distribute daily ad spend evenly across orders of that day and display as "ad cost per order" without qualification.
 
-**Why bad:** Shopify API rate limits (40 req/s) become a user-facing problem. Dashboard page loads are slow (Shopify API latency + processing time). Every merchant's page load consumes API quota.
+**Why it's wrong:** This fabricates individual attribution where none exists. Merchants may make incorrect product-level decisions based on artificially precise numbers.
 
-**Instead:** Sync in the background, serve from local PostgreSQL.
+**Do this instead:** Be explicit: "Blended ROAS — campaign-level attribution." True ROAS (revenue / (COGS + fees + ad spend)) is still a genuinely useful metric. Reserve per-order attribution for a future pixel-based implementation.
 
-### Anti-Pattern 4: Trusting `shop` from query string on authenticated API routes
+### Anti-Pattern 4: Popup Windows for Third-Party OAuth
 
-**What:** `GET /api/analytics/overview?shop=merchant.myshopify.com` — using the shop parameter from the URL to scope queries.
+**What people do:** `window.open(metaAuthUrl)` inside the embedded app to avoid a full-page redirect.
 
-**Why bad:** Any user who discovers the URL can query any shop's data by changing the `shop` parameter.
+**Why it's wrong:** Shopify Admin shell intercepts popup navigation. Popups cannot reliably auto-close. This is a documented failure pattern with acknowledgment from Shopify engineering (2026).
 
-**Instead:** Extract shop from the App Bridge session token (JWT `dest` claim), which is cryptographically bound to the authenticated merchant.
+**Do this instead:** `window.top.location.href = redirectUrl` to escape the iframe, complete OAuth at the top level, redirect back to `/admin?shop=...`.
 
-### Anti-Pattern 5: Computing transaction fees from first principles per request
+### Anti-Pattern 5: Blocking Scheduler on Ads Sync Failures
 
-**What:** Calling Shopify Payments API at dashboard load time to get exact fee amounts.
+**What people do:** `await syncAdSpend(shop)` in the cron loop without per-shop error catching.
 
-**Why bad:** High latency, rate limit consumption, fragile if Payouts API has delays.
+**Why it's wrong:** A revoked Meta token or Google API quota error for one shop aborts ad spend sync for all remaining shops in that scheduler tick.
 
-**Instead:** Fetch and store transaction fees during order sync. If fees aren't yet settled (order just placed), use a calculated estimate and mark as estimated. Update when payout data is available.
-
----
-
-## Suggested Build Order
-
-This order respects dependencies — each phase has what it needs from prior phases.
-
-### Phase 1: Data Foundation (build first — everything depends on this)
-
-1. Extend Prisma schema: `Order`, `LineItem`, `Product`, `ProductVariant`, `COGS`, `SyncState`
-2. Run migrations, verify in Prisma Studio
-3. Add required OAuth scopes to `shopify.app.profit-tracker.toml`: `read_orders`, `read_products`, `read_inventory`, `read_shopify_payments_payouts`
-
-**Why first:** Analytics API routes need models to exist. Sync service needs models to write to. React frontend needs API routes to exist. All paths converge on the database schema.
-
-### Phase 2: Backend Sync Service (build second)
-
-1. `lib/shopify-api.js` — wrapper around Shopify REST API calls with rate limiting and retry
-2. `lib/profit-calculator.js` — pure function: given order + COGS map → profit fields
-3. `lib/sync.js` — orchestrates product sync and order sync, updates SyncState
-4. Trigger historical sync on OAuth callback completion
-5. `node-cron` polling job (15-minute interval)
-
-**Why second:** Once sync is running, there's real data in the database to test API routes against.
-
-### Phase 3: Analytics API Routes (build third)
-
-1. `lib/session-middleware.js` — App Bridge JWT validation
-2. `routes/api.js` — all analytics and COGS endpoints
-3. Register in `server.js`
-4. Add order webhook handlers to `routes/webhooks.js` (`orders/paid`, `orders/updated`, etc.)
-
-**Why third:** React frontend needs these routes to be functional. Building API routes before React means you can test with curl/Postman against real data.
-
-### Phase 4: React Frontend (build fourth)
-
-1. Set up React build pipeline (Vite recommended — fast, simple, works well with Express serving the built assets)
-2. Install `@shopify/app-bridge-react`, `@shopify/polaris`
-3. Build dashboard views: overview, orders table, products table
-4. Build COGS entry form
-5. Express serves React build at `/admin` route
-
-**Why fourth:** All the plumbing exists. React becomes a straightforward presentation layer over working APIs.
+**Do this instead:** Wrap each shop's `syncAdSpend` in try/catch, same pattern as the existing `syncIncrementalOrders` loop already uses in `scheduler.js`.
 
 ---
 
-## Scalability Considerations
+## Recommended Build Order
 
-| Concern | At 100 merchants | At 1K merchants | At 10K merchants |
-|---------|-----------------|-----------------|-----------------|
-| Webhook processing | In-process async, fine | In-process async, fine | Consider queue (BullMQ + Redis) |
-| Polling job | `node-cron` in-process, fine | Monitor memory; may need separate worker | Definitely extract to worker process |
-| Database queries | Single-table aggregates, fast | Add `createdAt` composite indexes | Partition `orders` table by `shopDomain` |
-| API rate limits | No issue | Monitor per-shop quota usage | Implement per-shop rate limit tracking |
-| Historical sync on install | REST pagination, fine | REST pagination, fine | GraphQL Bulk Operations required |
+Dependencies drive this sequence. Each phase delivers independently testable value.
 
-For the MVP targeting $10K-$200K/month merchants, in-process background sync with `node-cron` is appropriate. The architecture doesn't paint you into a corner — extracting to a worker process (or adding BullMQ) is additive, not a rewrite.
+### Phase 1: Payout Fee Fix
+
+**Dependencies:** None. Modifies existing code only.
+**Rationale:** Verify data quality before building the waterfall chart or ads attribution on top of potentially incorrect fee data. If feesTotal is wrong, everything downstream is wrong.
+
+- Modify `lib/syncPayouts.js` (filter + diagnostic logging)
+- Add `GET /api/sync/payouts/status` to `routes/api.js`
+- Test on a real Shopify Payments store; confirm fee values match payout details page
+
+### Phase 2: Waterfall Chart
+
+**Dependencies:** Phase 1 (trustworthy fee data makes the chart meaningful).
+**Rationale:** No schema changes, pure read-only feature on existing data. High visual impact, low implementation risk.
+
+- Add `GET /api/dashboard/orders/:orderId/waterfall` to `routes/api.js`
+- New `web/src/components/WaterfallChart.jsx`
+- Modify `web/src/components/OrdersTable.jsx` (row click handler)
+
+### Phase 3: Margin Alerts
+
+**Dependencies:** Phase 1 (accurate fees affect margin percentages).
+**Rationale:** Schema change required (migrate before UI). Alerts use the same product query already shipping in v1.0 — low logic risk.
+
+- Prisma migration: extend `ShopConfig` (marginThresholdPct, alertsEnabled)
+- Add `GET /api/alerts` and `PUT /api/alerts/config` to `routes/api.js`
+- New `web/src/components/AlertBanner.jsx`
+- Modify `web/src/components/ProductsTable.jsx` and `web/src/App.jsx`
+
+### Phase 4: Ads Infrastructure + Meta Integration
+
+**Dependencies:** Phase 3 complete (migration already in flight — batch all schema changes together).
+**Rationale:** Largest phase. Establishes the shared AdConnection + AdSpend + OAuth infrastructure. Meta first because Marketing API Standard Access tokens are non-expiring (simpler than Google's refresh token flow).
+
+- Prisma migration: `AdConnection`, `AdSpend`, extend `OAuthState` — all in one migration with Phase 3 changes if sequencing allows, or a second migration if Phase 3 ships independently
+- New `routes/ads-auth.js` (Meta OAuth only)
+- New `lib/syncAdSpend.js` (Meta platform handler)
+- New `web/src/components/AdsOverview.jsx`
+- Modify `lib/scheduler.js`, `server.js`, `web/src/App.jsx`
+
+### Phase 5: Google Ads Integration
+
+**Dependencies:** Phase 4 (shared AdConnection + AdSpend infrastructure + AdsOverview component).
+**Rationale:** Google adds only the Google-specific OAuth routes and sync handler. No schema changes. The infrastructure is already in place.
+
+- Add `/auth/google` and `/auth/google/callback` to `routes/ads-auth.js`
+- Add Google platform handler to `lib/syncAdSpend.js` (with token refresh logic)
+- Extend `web/src/components/AdsOverview.jsx` with Google connection UI
+
+---
+
+## Integration Points: Existing vs New
+
+| Boundary | Existing Behavior | v2.0 Change |
+|----------|------------------|-------------|
+| `verifySessionToken` middleware | Guards all `/api/*` | Ads OAuth routes (`/auth/meta`, `/auth/google`) must be OUTSIDE `/api` — top-level window, no session token. `/api/ads/*/connect` endpoints remain inside `/api` (JWT-protected). |
+| `scheduler.js` cron | `syncIncrementalOrders` only | Add `syncAdSpend` call; must not block order sync if ads sync fails |
+| `OAuthState` model | Shopify install CSRF | Add `platform` column; existing `null` platform = Shopify install |
+| `syncPayouts.js` | Called from API route + scheduler | Extend in-place; no interface change to callers |
+| `profitEngine.js` | Pure calculation function | Not modified in v2.0 |
+| CSP headers (`server.js`) | `frame-ancestors` per shop | OAuth callback routes arrive at top-level (not iframe) — no frame-ancestors issue on callbacks |
+| `ShopConfig` model | Plan + third-party fee rate | Extend with alert threshold columns |
+
+---
+
+## Scaling Considerations
+
+| Scale | Architecture Adjustment |
+|-------|------------------------|
+| 0–100 shops | Current in-process scheduler handles everything |
+| 100–1K shops | 15-min cron may approach timeout. Parallelize shop syncs with `Promise.allSettled` instead of sequential loop. |
+| 1K+ shops | Extract sync to worker process. Not needed for v2.0. |
+
+**Google Ads API quota note:** Basic access developer tokens are limited to 15,000 operations/day. Each shop sync = 1 operation. At ~500 shops this becomes a constraint. Apply for Standard access (unlimited) once the app demonstrates traction. Surface this limitation proactively in the Ads connection UI ("syncs daily").
 
 ---
 
 ## Sources
 
-- Shopify Admin API documentation (REST and GraphQL, version 2025-10): patterns based on training through Aug 2025. Confidence MEDIUM for specific field names — verify `transaction.fees` GraphQL field availability in 2025-10 schema before building.
-- Existing codebase analysis: `.planning/codebase/ARCHITECTURE.md`, `.planning/codebase/INTEGRATIONS.md`, `.planning/codebase/CONCERNS.md` — HIGH confidence (direct code inspection)
-- Shopify Payments Payouts GraphQL API: MEDIUM confidence — field names may differ from training data. Official reference: `https://shopify.dev/docs/api/admin-graphql/latest/objects/ShopifyPaymentsAccount`
-- App Bridge session token JWT pattern: HIGH confidence — stable Shopify pattern since App Bridge 3.0
-- PostgreSQL aggregation for analytics: HIGH confidence — standard SQL patterns
+- Shopify GraphQL Admin API — ShopifyPaymentsBalanceTransaction: https://shopify.dev/docs/api/admin-graphql/latest/objects/ShopifyPaymentsBalanceTransaction
+- Shopify GraphQL Admin API — ShopifyPaymentsAccount: https://shopify.dev/docs/api/admin-graphql/latest/objects/shopifypaymentsaccount
+- Shopify GraphQL Admin API — CustomerJourneySummary: https://shopify.dev/docs/api/admin-graphql/latest/objects/customerjourneysummary
+- Shopify developer community — Balance Transactions filter by payout: https://community.shopify.dev/t/balance-transactions-by-payout-id/20934
+- Shopify developer community — OAuth popup reclaim: https://community.shopify.dev/t/shopify-oauth-popup-cannot-auto-close-after-successful-install-when-initiated-from-admin-shopify-com-admin-shell-reclaiming-window/28862
+- Meta Marketing API — Authorization: https://developers.facebook.com/docs/marketing-api/get-started/authorization
+- Meta — Access tokens (long-lived): https://developers.facebook.com/docs/facebook-login/guides/access-tokens/get-long-lived/
+- Meta Marketing API — Insights: https://developers.facebook.com/docs/marketing-api/insights/
+- Google Ads API — OAuth2 overview: https://developers.google.com/google-ads/api/docs/oauth/overview
+- Google OAuth2 — Web Server Applications: https://developers.google.com/identity/protocols/oauth2/web-server
 
 ---
-
-*Architecture research: 2026-03-10*
+*Architecture research for: Shopify Profit Analytics v2.0*
+*Researched: 2026-03-18*

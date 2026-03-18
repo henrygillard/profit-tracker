@@ -1,235 +1,386 @@
-# Feature Landscape
+# Feature Research
 
-**Domain:** Shopify profit analytics dashboard (embedded app, $10K–$200K/mo merchants)
-**Researched:** 2026-03-10
-**Knowledge cutoff:** August 2025
-**Sources:** Training data — competitor product analysis (Triple Whale, BeProfit, Peel Insights, Lifetimely), Shopify API documentation, merchant community patterns (Shopify Community, Reddit r/shopify)
-
----
-
-## Table Stakes
-
-Features users expect in any profit analytics product. Missing = product feels broken or useless.
-
-| Feature | Why Expected | Complexity | Confidence | Notes |
-|---------|--------------|------------|------------|-------|
-| Store-level P&L overview | The entire point of the product — revenue, COGS, fees, net profit in one view | Medium | HIGH | Every competitor leads with this screen |
-| Date range filtering (daily/weekly/monthly/custom) | Merchants need to compare periods; no date filter = useless for decision-making | Low | HIGH | Standard in every analytics tool |
-| Revenue from Shopify orders | Raw input data; without it nothing else works | Low | HIGH | Shopify Orders API, well-documented |
-| Profit per order | Merchants blame individual orders for losses; need drill-down | Medium | HIGH | BeProfit and Triple Whale both surface this |
-| Profit per product / SKU | Where the money actually is or isn't; SKU-level is the diagnostic unit | Medium | HIGH | Most-requested feature in r/shopify analytics threads |
-| COGS entry (manual per SKU) | Without COGS, profit is meaningless; manual is the MVP path | Low | HIGH | BeProfit, Lifetimely both start here |
-| Shopify transaction fee calculation | Shopify charges 0.5–2% on non-Shopify Payments orders; merchants don't know this | Medium | HIGH | Available in Shopify Transactions API (`gateway`, `payment_gateway_names`, `total_price_usd`) |
-| Payment processor fee calculation | Stripe/PayPal/Shopify Payments take 1.5–2.9%+$0.30; major profit leak | Medium | HIGH | Gateway-specific rates; pulled from `transactions` object or configured manually |
-| Best/worst products by margin | Top-10-style list — "kill bad SKUs" is the primary action users take | Low | HIGH | Sort derived metric; cheap to add once profit/SKU exists |
-| Basic line/bar charts for profit over time | Visual trend is expected; a wall of numbers alone fails UX | Medium | HIGH | Standard for any dashboard product |
-| Orders sync from Shopify API | Foundation for all calculations | Low | HIGH | REST `GET /orders.json` or GraphQL `orders` query |
-| Products/variants sync (for SKU mapping) | Needed to attach COGS to line items | Low | HIGH | REST `GET /products.json` |
+**Domain:** Shopify Profit Analytics App — v2.0 New Feature Landscape
+**Researched:** 2026-03-18
+**Confidence:** MEDIUM-HIGH (Shopify API fields verified against official docs; competitor patterns from App Store listings + official help docs; ad API details from official developer blogs and changelogs)
 
 ---
 
-## How COGS Input Works (Competitor Analysis)
-
-**Confidence: HIGH** for patterns; **MEDIUM** for exact implementation details.
-
-### Manual Entry (All Competitors)
-Every product (BeProfit, Triple Whale, Lifetimely) offers per-SKU manual COGS entry as the baseline. The UX is typically a spreadsheet-style table of variant titles with a COGS field. This is the MVP path — simple, fast, and the merchant knows their numbers.
-
-### CSV Import (BeProfit, Triple Whale)
-CSV import is the second step: a template download (columns: SKU or variant ID, cost), upload, and bulk-apply. This is table stakes for stores with 50+ variants where manual entry is impractical. Format is typically: `variant_id` OR `sku`, `cost`. Matching by SKU string is more portable than variant ID.
-
-### Shopify `costPerItem` / `inventoryItem.unitCost` (GraphQL)
-Shopify stores cost-per-unit in the inventory item object. Access via GraphQL:
-```
-query {
-  inventoryItem(id: "gid://shopify/InventoryItem/...") {
-    unitCost { amount, currencyCode }
-  }
-}
-```
-This field is populated if the merchant uses Shopify's cost tracking (set in admin under Products > Cost per item). **Confidence: HIGH** — this is official Shopify API. However, many merchants do NOT fill this field, so it cannot be the sole input method. Use as auto-populate source, not the only path.
-
-### Date-Based COGS (Lifetimely differentiator)
-Lifetimely supports COGS that change over time (e.g., supplier price increase in Q3). This is a differentiator, not table stakes.
+> **Note:** v1.0 table-stakes features (P&L overview, date filtering, per-order table, COGS entry, basic charts, billing gate) are already built and not re-researched here. This document covers the five new v2.0 feature areas only.
 
 ---
 
-## How Profit Per Order Is Calculated
+## Feature 1: Payout Fee Fix (FEE-FIX-01)
 
-**Confidence: HIGH** — this is arithmetic, not an API assumption.
+### What Merchants Expect
 
-```
-Net Profit =
-  Order Revenue (subtotal_price)
-  - COGS (sum of line_item.quantity × variant_cost for each line item)
-  - Shopify transaction fee (if not on Shopify Payments: 0.5%/1.0%/2.0% by plan)
-  - Payment processor fee (gateway-specific: Shopify Payments = 2.9%+$0.30 basic; rates vary by plan)
-  - Shipping cost paid by store (total_shipping_price_set.shop_money.amount minus shipping charged to customer)
-  - Refunds (if any: refund_line_items reduce COGS back, refund transactions reduce revenue)
-  - Discounts are already subtracted in subtotal_price
-```
+Merchants on Shopify Payments expect to see the *exact* processing fee deducted per order — not an estimated rate. The "aha moment" is the difference between "2.9% of $150 = $4.35" (estimated) and "$4.23" (the actual amount Shopify took). Even small per-order discrepancies compound into meaningful monthly errors for stores doing $50K+/month.
 
-**Fee calculation details (MEDIUM confidence — rates accurate as of training data, verify at build time):**
+The v1.0 implementation syncs payout data but the 1:1 mapping of payout-to-order is unverified. This is a latent accuracy risk that undermines the core value proposition.
 
-| Shopify Plan | Transaction Fee (non-Shopify Payments) | Shopify Payments CC rate (online) |
-|---|---|---|
-| Basic ($39/mo) | 2.0% | 2.9% + $0.30 |
-| Shopify ($105/mo) | 1.0% | 2.6% + $0.30 |
-| Advanced ($399/mo) | 0.5% | 2.4% + $0.30 |
-| Plus | Negotiated | Negotiated |
+### Table Stakes
 
-Transaction fees are charged by Shopify on top of gateway fees when merchants use a third-party gateway. If merchant uses Shopify Payments, transaction fee is $0 but the Shopify Payments processing fee applies.
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Per-order exact fee from balance transaction data | Merchants need accurate net profit — an estimated rate misleads them | MEDIUM | `ShopifyPaymentsBalanceTransaction.fee` field confirmed in official GraphQL docs. `associatedOrder` links to orders. `sourceOrderTransactionId` is the precise bridge. HIGH confidence this works. |
+| Fee tied to actual settled transaction (not estimated rate) | Payout fee is the ground truth — what Shopify actually moved | MEDIUM | Query `shopifyPaymentsAccount > balanceTransactions`, join to order by `associatedOrder.id`. Updated in API 2025-04 to also cover adjustment orders. |
+| Graceful "pending" state for unsettled orders | Orders placed recently may not have settled into a payout yet | LOW | Show "Pending" for fee field rather than showing estimated rate as if it were exact. Critical to not mix estimated and exact without indicating which is which. |
+| Correct refund fee reversal using exact amounts | Refunded orders should reverse the exact fee, not an estimated reversal | MEDIUM | Balance transaction `type` field distinguishes charge from refund. v1.0 handles reversal logic — verify it uses exact amounts from balance transaction when available. |
 
-**Shopify API data for fees:**
-- `order.payment_gateway` — identifies the gateway (e.g., "shopify_payments", "paypal", "stripe")
-- `order.transactions[]` — each transaction has `amount`, `gateway`, `kind` ("sale", "refund", "capture")
-- `order.total_price` vs `order.subtotal_price` — tax and shipping are separated
-- Payouts API (`GET /shopify_payments/payouts.json`) — actual net payout per payout period; useful for reconciliation but not per-order granularity
-- **Gap:** Shopify does NOT return the exact fee amount per transaction in the orders API. Fees must be calculated by the app using known rate tables. Payout transactions (`/shopify_payments/balance/transactions.json`) DO include `fee` field — but this is at payout level, not order level. **Confidence: MEDIUM** — verify this gap before building.
+### Differentiators
 
----
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Per-order "fee verified" indicator | Small badge showing orders where exact payout fee was confirmed vs. estimated fallback | LOW | Builds trust. High UX value for minimal dev cost. "Verified" = balance transaction found. "Estimated" = using rate table. |
+| Payout reconciliation view | Show which orders rolled into which payout, with totals that tie to bank deposit | HIGH | No competitor exposes this to end users. Genuinely differentiating for accountants and ops-heavy stores. Defer to v2.1+. |
 
-## Shopify API Data Available for Fee Calculation
+### Anti-Features
 
-**Confidence: HIGH** for API existence; **MEDIUM** for exact field behavior.
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Show estimated fee when payout not yet settled | Seems better than a blank field | Estimated fee is not the exact fee — merchants making pricing decisions on wrong data is churn risk | Show "Pending (est. $X)" — explicit about what is estimated |
+| Sync all historical balance transactions on every dashboard load | Seems complete | Rate limits + huge data volume for high-volume stores | Incremental: sync balance transactions only for orders without a verified fee already stored |
 
-| API Endpoint | Data Available | Use For |
-|---|---|---|
-| `GET /orders.json` | `subtotal_price`, `total_price`, `total_tax`, `total_shipping_price_set`, `payment_gateway`, `transactions[]`, `refunds[]`, `line_items[]` | Revenue, shipping, COGS matching, refunds |
-| `GET /orders/{id}/transactions.json` | `amount`, `gateway`, `kind`, `status` | Determine which gateway processed; basis for fee calc |
-| `GET /shopify_payments/payouts.json` | `amount`, `currency`, `status`, `summary` (fees, charges, refunds) | Reconciliation, payout-level P&L |
-| `GET /shopify_payments/balance/transactions.json` | `type`, `amount`, `fee`, `net`, `source_order_id` | Actual Shopify Payments fee per transaction — **HIGH VALUE** |
-| `GET /products.json` + `GET /variants/{id}.json` | `sku`, `price`, `compare_at_price` | SKU mapping |
-| GraphQL `inventoryItem.unitCost` | `amount`, `currencyCode` | Auto-populate COGS from Shopify cost field |
+### API Reality (HIGH confidence)
 
-The `balance/transactions` endpoint is the key to accurate Shopify Payments fee data per order. For non-Shopify-Payments gateways, fees must be estimated from rate tables.
+- `ShopifyPaymentsBalanceTransaction` exposes: `fee` (the processing fee), `amount`, `net`, `associatedOrder` (links to Order), and `sourceOrderTransactionId` (precise bridge to the specific order transaction).
+- Payout object (`ShopifyPaymentsPayout`) has only summary-level totals — not suitable for per-order attribution. Per-order fee lives on `balanceTransaction`, not payout.
+- API 2025-04 changelog: added `fees` and `net` fields on `adjustmentsOrders` within balance transactions — covers edge cases where adjustments span multiple orders.
+- Correct query path: filter `balanceTransactions` where `associatedOrder.id` matches the order, read `fee`.
+- For non-Shopify-Payments gateways: exact fee is not available via API. Continue using configurable rate tables.
+
+### Dependency on Existing Features
+
+Builds directly on v1.0 payout sync. The fix is schema + logic: after syncing balance transactions, store the exact fee on the order record and mark it as "verified". Replace the estimated fee in profit calculations for any order where a verified fee exists.
 
 ---
 
-## Standard Chart Types for Profit Analytics
+## Feature 2: Waterfall Chart (CHART-01)
 
-**Confidence: HIGH** — consistent across all competitors observed.
+### What Merchants Expect
 
-| Chart Type | What It Shows | Where Used |
-|---|---|---|
-| Line chart (time series) | Revenue vs profit over time | Main dashboard overview |
-| Bar chart (grouped) | Revenue vs COGS vs fees vs profit per period | Period comparison |
-| Horizontal bar chart | Top/bottom products by margin % | Product performance table |
-| Stacked bar / waterfall | Revenue decomposition (COGS + fees + shipping + profit) | Per-order or period breakdown |
-| Summary KPI cards | Total revenue, total profit, avg margin %, order count | Top of every view |
-| Scatter plot | Margin % vs order volume per product | Advanced — differentiator, not MVP |
+The waterfall chart is the visual "aha moment" — showing how $150 of revenue became $47 of net profit. Each deduction step (COGS, Shopify fees, shipping, ad spend) is a descending bar. This is the dominant analytical visualization for profit decomposition across all major competitors.
 
-MVP minimum: line chart for profit over time + KPI cards + sortable table for products. Waterfall/decomposition chart is a high-value differentiator.
+Triple Whale uses contribution margin decomposition as a primary metric. BeProfit's "cost breakdown" view shows the same concept. TrueProfit shows real-time net profit dashboards with component breakdown. The waterfall chart is the visual form of what the existing KPI cards communicate numerically.
+
+### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Store-level waterfall: Revenue → COGS → Fees → Net Profit | Merchants need to see where money went at store level for the selected date range | LOW | Recharts has a documented waterfall example. Data already exists from KPI card calculations. Transform only — no new API calls. |
+| Per-order waterfall (drill from order table into breakdown) | Per-order profit table already exists; natural next step is visualizing a single order's decomposition | MEDIUM | Triggered from existing per-order table. Modal or expanded row. Order-level data already in DB. |
+| Color coding: green for revenue/profit, red/orange for deductions | Financial visualization convention merchants recognize | LOW | Simple color map. Negative net profit = red final bar. |
+| Handles negative profit (loss orders) | Some orders will be net negative — chart must not break | LOW | Recharts waterfall handles negative bars. Test with seeded loss orders. |
+| Correct rendering when COGS is missing | Many orders will have $0 COGS (not entered) — chart should not show misleading "100% profit" | LOW | If COGS coverage < 100%, annotate the chart: "COGS missing for X% of items in this period — profit may be overstated." |
+
+### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Ad spend deduction step in waterfall | When Meta/Google Ads integration ships, show ad spend as a waterfall step — makes the chart the unifying "north star" visualization | LOW (incremental once ADS-01/02 done) | This is the payoff for the whole v2.0 milestone. All cost categories visible in one chart. |
+| SKU-level waterfall | Breakdown for a single product/variant — useful for pricing decisions | MEDIUM | Build after per-order and store-level are validated. |
+
+### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Animated waterfall on load | Looks impressive in demos | Adds JS weight; can feel gimmicky in a business analytics tool | Static chart renders faster; more professional |
+| Waterfall with 10+ cost categories | Seems thorough | Too many steps = unreadable at small screen sizes | Cap at 6 categories max: Revenue, COGS, Shopify Fees, Shipping, Ad Spend, Net Profit |
+| Horizontal waterfall | Some designs use this | Vertical (descending) is the financial standard merchants recognize from accounting tools | Use vertical |
+
+### Implementation Reality (HIGH confidence)
+
+- Recharts has a documented waterfall example at `recharts.github.io/en-US/examples/Waterfall/`. Uses `Bar` with `[low, high]` range data + custom shape function + a `computeWaterfallData` transform helper (~30 lines).
+- Already using Recharts for the v1.0 trend line chart — zero new charting library dependency.
+- Store-level waterfall data already exists in the existing P&L calculation. This is primarily a new chart component consuming existing data.
+- Per-order waterfall data exists in the per-order profit table query. Needs the order-level breakdown object surfaced to the UI.
+
+### Dependency on Existing Features
+
+- Store-level waterfall: depends on existing KPI card calculations (v1.0 ✓) — data already present.
+- Per-order waterfall: depends on existing per-order profit table + profit breakdown stored per order (v1.0 ✓).
+- Ad spend step: depends on Meta Ads (ADS-01) or Google Ads (ADS-02) — best delivered after those ship.
+- **Accuracy note**: Payout fee fix (FEE-FIX-01) should ship before or with waterfall. Showing a beautiful chart with estimated fees as "Shopify Fees" misleads merchants. Fix fees first.
 
 ---
 
-## Differentiators
+## Feature 3: Margin Alerts (ALERT-01)
 
-Features that set the product apart. Not expected by all users, but valued when present.
+### What Merchants Expect
 
-| Feature | Value Proposition | Complexity | Confidence | Notes |
-|---------|-------------------|------------|------------|-------|
-| "10-minute setup" onboarding flow | Direct attack on competitor complexity complaints; guided COGS entry wizard | Medium | HIGH | Addressable with good UX; no technical barrier |
-| Shopify `costPerItem` auto-import | Pre-populates COGS for merchants already using Shopify cost tracking — zero-effort for them | Low | HIGH | One GraphQL query; high merchant delight |
-| Profit waterfall chart per order | Visual breakdown of where revenue went (COGS, fees, shipping, kept) — more intuitive than tables | Medium | MEDIUM | Seen in Lifetimely; strong UX differentiator |
-| Margin health alerts | "These 3 products are below 10% margin" — pushes insight rather than requiring merchant to find it | Medium | MEDIUM | Rule-based alerting; no ML needed for v1 |
-| CSV COGS import with SKU matching | Bulk COGS entry for large catalogs; must handle SKU string matching, not just variant ID | Medium | HIGH | BeProfit does this; expected for stores with 50+ SKUs |
-| Fee breakdown transparency | Show exactly how much Shopify/Stripe/PayPal took — merchants hate not knowing this | Low | HIGH | High emotional value; low build cost once fee calc is done |
-| Payout reconciliation view | Match Shopify payouts to expected profit — "why did I only get $X?" answered | High | MEDIUM | Uses Payouts API; complex but highly valued |
-| Date-based COGS versioning | COGS changes over time (supplier increases); historical accuracy requires this | High | MEDIUM | Lifetimely differentiator; Phase 2+ |
-| Ad spend integration (Meta/Google) | True profit after marketing spend — most-wanted Phase 2 feature | High | HIGH | Out of scope Phase 1 per PROJECT.md |
+Merchants want the app to surface problems proactively — not wait for them to discover a loss-making SKU. The dominant UX pattern across Shopify analytics apps is an in-dashboard alert banner that appears automatically when a product/SKU drops below a configurable threshold. Email alerts exist as a differentiator but are not universally expected.
+
+Competitor evidence: GoProfit "Smart Alerts" (monitors drops and spikes); Margin Insight "Margin Issue Tracker" (filterable at-risk products table); Shopimize "Negative Margin Alert" (explicit call-out for below-zero products).
+
+### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| In-dashboard alert banner for SKUs below threshold | Every modern analytics app has this pattern. Missing = product feels passive | LOW | Banner on dashboard or Products tab. Shows offending SKUs, current margin %, threshold. |
+| Configurable margin threshold per shop (global default) | "Below 10%" varies by merchant type — must be settable. Default 20% is a reasonable starting point | LOW | Single settings field per shop. Persist in DB. Default to 20% gross margin per industry benchmarks. |
+| Negative-margin alerts (always on, threshold = 0) | A product losing money on every sale is always critical — no threshold config should hide this | LOW | Special case: negative margin = CRITICAL alert, shown regardless of threshold setting. |
+| Alert count badge on Products nav item | Passive awareness — merchant sees "3 SKUs at risk" without needing to look | LOW | Polaris `Badge` component. Count of SKUs below threshold. Updates on dashboard load. |
+| Dismissible alerts with re-trigger logic | Merchants may know about a problem and not want to see it every load | MEDIUM | "Dismiss for 7 days" option. Resurfaces if margin drops further or after 7 days. |
+
+### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Per-SKU threshold override | Some SKUs are intentional loss leaders — let merchants exclude them from alerts | MEDIUM | Per-variant override flag. Reduces false positives. Most apps don't offer this. |
+| Email digest alert (daily/weekly) | Proactive — merchant gets notified even when not in the app | HIGH | Requires email sending infrastructure (Sendgrid/Postmark) not currently in stack. High value but meaningful scope increase. Defer to v2.1+. |
+| Margin trend alert (dropping, not yet crossed threshold) | Catches deteriorating margins before they become critical | HIGH | Requires historical per-SKU margin tracking over time. Complex. Definitely v2.1+. |
+
+### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Per-order alerts | Seems thorough | Order margins fluctuate naturally with discounts and product mix. Not actionable at order level. | SKU-level only — that's where corrective action happens |
+| Auto-remediation suggestions ("raise price to $X") | Seems smart | App doesn't know competition, intent, or cost structure. Wrong recommendation = liability risk. | Surface the problem clearly. Merchant decides the fix. |
+| Real-time per-order alerts (push notification) | Feels premium | Processing overhead; most margin problems are structural (SKU pricing), not per-order emergencies | Recalculate alert state on dashboard load. Nightly batch refresh is sufficient. |
+| Slack/webhook push alerts | Power feature for ops teams | Scope creep; not in current stack; low demand at $29/month price point | Email digest is the right stepping stone first |
+
+### UX Pattern (MEDIUM confidence — from competitor listing analysis)
+
+The dominant pattern is a persistent in-dashboard banner + a filterable at-risk products view. NOT a modal popup (intrusive on every load) and NOT email-only (too easy to ignore). The alert should feel like a "health check" surfaced at the top of the Products tab.
+
+### Dependency on Existing Features
+
+- Requires per-product/SKU margin data from existing calculations (v1.0 ✓).
+- Requires COGS data — alert system should note "COGS missing for X SKUs — margin data unreliable" using the existing COGS coverage indicator (v1.0 ✓).
+- New DB field: `alertMarginThreshold FLOAT DEFAULT 0.20` per shop settings record.
+- Margin Alerts are independent of fee fix, waterfall, and ads. Can ship in any order or in parallel.
 
 ---
 
-## Anti-Features
+## Feature 4: Meta Ads Integration (ADS-01)
 
-Features to deliberately NOT build — they add complexity without proportional value for target market.
+### What Merchants Expect
 
-| Anti-Feature | Why Avoid | What to Do Instead |
-|---|---|---|
-| Multi-channel support (Amazon, eBay, Etsy) | Each channel has different fee structures, APIs, and data models; doubles scope for <20% of users | Stay Shopify-only; position as "built for Shopify" |
-| Customer cohort / LTV analysis | Different product (retention analytics vs profit analytics); confuses the value prop | Defer to Phase 3 per PROJECT.md roadmap |
-| Real-time / live order feed | Profit analytics is inherently batch (fees settle on payouts); "live" creates false precision | Batch sync every few hours is sufficient and accurate |
-| Mobile app | Merchants do setup and review on desktop; mobile adds platform tax with no analytics value | Embedded admin is mobile-responsive enough |
-| Predictive / AI profit forecasting | Requires long history, adds ML complexity, and merchant trust is hard to build | Surface trends via simple charts; leave forecasting to Phase N |
-| Inventory management | Separate product category with different buyers; don't conflate with profit analytics | COGS input is the overlap; stop there |
-| Multi-currency complexity beyond display | Currency conversion for profit is a rabbit hole; introduces exchange rate risk math | Store in shop currency; display in shop currency |
-| "Integrations marketplace" architecture | Premature generalization; adds infra complexity before PMF | Hardcode Shopify; abstract only when second platform is real |
-| Accounting software sync (QuickBooks, Xero) | Phase 2+ feature with high integration maintenance cost | Manual CSV export is sufficient for MVP |
+Merchants running Meta Ads (Facebook + Instagram) want ad spend deducted from profit. The minimum expectation: "show me total Meta spend for this period subtracted from my P&L." Stretch goal: per-order attribution showing which orders came from which campaign. Triple Whale, BeProfit, and TrueProfit all offer this — it is competitive table stakes for the $29/month price point.
+
+### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Meta ad account OAuth connection | Every competitor supports this. Missing = not competitive at this price point | MEDIUM | Standard OAuth 2.0. Scopes: `ads_read` only (sufficient for spend reporting). No `ads_management` needed. |
+| Total Meta spend for date range pulled into P&L | Minimum viable: deduct total spend from store profit for the period | MEDIUM | Ads Insights API: `GET /{ad_account_id}/insights?level=account&fields=spend&date_preset=last_30d`. Straightforward. |
+| Ad spend line in store-level P&L KPI cards | Extend existing KPI display: add "Meta Ad Spend" row | LOW | After data is pulled, this is a UI extension of existing KPI cards. |
+| Ad spend step in waterfall chart | Connects to CHART-01 — the waterfall is the unifying visualization | LOW | Add "Ad Spend" step to waterfall. Low incremental cost after waterfall chart exists. |
+| Disconnect Meta account | Merchant must be able to remove the connection | LOW | Delete stored access token from DB. |
+
+### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Campaign-level spend breakdown | See which campaign consumed what budget in the period | LOW (incremental after account-level) | Same Insights API endpoint, `level=campaign`. Add campaign breakdown table to UI. |
+| Per-order attribution via Shopify UTM data | Link specific orders to Meta campaigns via `customerJourneySummary.firstVisit.utmParameters` — source = "facebook", campaign = utm_campaign | HIGH | UTM fields confirmed on Shopify `CustomerVisit` GraphQL object. Accuracy degrades with iOS privacy (40% of traffic may show as "Direct"). Be explicit about limitations. |
+| ROAS calculation (revenue / ad spend) | Familiar metric. Merchants think in ROAS. | LOW (after campaign data exists) | Derived metric. `ROAS = revenue_in_period / spend_in_period`. High perceived value. |
+| True profit per campaign (revenue - COGS - fees - campaign spend) | North-star DTC metric | HIGH | Requires per-order UTM attribution working first. Best as v2.1 feature. |
+
+### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Meta Pixel / CAPI implementation | "Complete Meta integration" | Wrong scope — CAPI is conversion tracking for Meta optimization, not profit analytics. Requires frontend pixel + server-side CAPI. Separate infrastructure from spend reporting. | Pull spend from Marketing API (read-only). Don't touch the merchant's CAPI setup. |
+| Claim accurate per-order attribution | Seems like the goal | Impossible. iOS privacy, 30-day attribution window, Meta over-attribution (Meta claims 20-30% more revenue than Shopify attributes). Claiming accuracy = churn risk when numbers don't match. | Label attribution as "best-effort based on UTM data. Actual Meta-attributed revenue may differ." |
+| Manage ads from the app | Power feature | Out of scope. Requires `ads_management` scope (harder to get approved). Creates liability. | Read-only spend data only. |
+
+### API Reality (MEDIUM confidence — from official Meta developer docs and changelog)
+
+- Meta Marketing API is at v22+ (2026). Developer app creation at developers.facebook.com, enable Marketing API product.
+- OAuth scopes for read-only reporting: `ads_read`. Optional: `business_management` for multi-ad-account scenarios.
+- Ads Insights endpoint: `GET /{ad_account_id}/insights` with `fields=spend,campaign_name,impressions,clicks` and date range (`since`, `until` in YYYY-MM-DD, or `date_preset`).
+- Attribution window changes effective January 12, 2026: Meta deprecated two view-through attribution windows. This affects Meta's own attribution metrics — does NOT affect pulling total spend, which is unambiguous.
+- Rate limits: rolling hourly window. For daily pulls per merchant, not a practical constraint.
+- Per-order attribution via UTM: Shopify `CustomerJourneySummary.firstVisit.utmParameters` has `source`, `medium`, `campaign` confirmed in official GraphQL docs. Populated when customer clicked a tagged link. 30-day attribution window on Shopify side. Not populated for direct/organic traffic.
+
+### Dependency on Existing Features
+
+- Store-level P&L KPI cards (v1.0 ✓) — add "Ad Spend" row.
+- Waterfall chart (CHART-01) — add "Ad Spend" step. Best delivered together.
+- Per-order UTM attribution: requires schema extension to store UTM data per order during sync. May need to re-sync orders or add UTM enrichment on order webhook.
+
+---
+
+## Feature 5: Google Ads Integration (ADS-02)
+
+### What Merchants Expect
+
+Same fundamental expectation as Meta: total Google Ads spend visible in the profit dashboard. Google is typically the second ad platform added after Meta in Shopify analytics apps. The majority of DTC merchants on Shopify run both.
+
+### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Google Ads account OAuth connection | Triple Whale, BeProfit, TrueProfit all support it. Expected at competitive price point. | HIGH | **Critical gating requirement**: Google Ads API requires a developer token (separate from OAuth token), approved by Google. Standard OAuth is insufficient. Developer token requires a Google Ads Manager Account and an application/approval process (days to weeks). This is the #1 implementation risk for this feature. |
+| Total Google Ads spend for date range | Same as Meta: deduct from P&L | MEDIUM | GAQL query: `SELECT metrics.cost_micros FROM customer WHERE segments.date DURING LAST_30_DAYS`. Cost in **micros** (divide by 1,000,000 to get dollars). |
+| Separate Google spend line in P&L | Merchants want Meta and Google shown separately | LOW | "Google Ads: $X" separate from "Meta Ads: $Y". |
+| Disconnect Google account | Remove connection | LOW | Delete stored refresh token. |
+
+### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Campaign-level spend breakdown | Which Google campaign spent what | LOW (after account-level works) | GAQL query with `campaign.name` segment. |
+| Google Shopping campaign isolation | Shopping campaigns are how most Shopify product stores run Google Ads — filter by campaign type | MEDIUM | GAQL `WHERE campaign.advertising_channel_type = 'SHOPPING'`. Valuable for product-heavy stores. |
+| Per-order attribution via gclid / UTM | `utm_source=google` in Shopify `CustomerJourneySummary` — same approach as Meta | HIGH | Accuracy similar to Meta (degrades with direct traffic). gclid auto-tagging must be enabled on merchant's Google Ads account. |
+
+### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Google Ads conversion upload (import conversions) | "Full integration" | Requires `ads_management` scope + Google's Enhanced Conversions compliance. This is optimization tooling, not profit analytics. Wrong direction. | Read-only spend via GAQL only |
+| Report Google-attributed revenue as ground truth | Attribution completeness | Google attribution models over-attribute similar to Meta. Conversion lag up to 3 hours for imported conversions. Google's number will never match Shopify's. | Show spend-based metrics (spend, ROAS = Shopify revenue / Google spend). Don't use Google's attributed revenue figure. |
+
+### API Reality (MEDIUM confidence — from official Google Ads developer blog and npm package)
+
+- Current API version: v20 (released June 2025). v19 sunset February 11, 2026. Use v20+ only.
+- Node.js library: `google-ads-api` on npm, v23.0.0 (last published ~1 month ago as of research date).
+- Authentication: OAuth 2.0 refresh token per merchant + developer token in request headers. Developer token is **global per app** (one developer token for all merchants using the app).
+- **Developer token approval**: Standard tokens only get test account access. Production access requires Google approval. Apply early — this is a multi-week external dependency.
+- GAQL is SQL-like and well-documented. A spend query is simple. Cost in micros requires dividing by 1,000,000.
+- Rate limits: reasonable for daily per-merchant pulls.
+
+### Dependency on Existing Features
+
+- Shares the "Ad Platforms" connection UI with Meta Ads (ADS-01). Implement Meta first to establish the pattern — Google reuses the same settings section.
+- Google Ads integration is strictly harder than Meta due to developer token approval. Meta first is the correct sequencing. Start developer token application during v2.0 development so it's ready for v2.1.
 
 ---
 
 ## Feature Dependencies
 
 ```
-Shopify Orders Sync
-  → Revenue figures (subtotal, shipping, tax breakdown)
-  → Line items (product/variant IDs for COGS matching)
-  → Transactions (gateway identification for fee calc)
-  → Refunds (adjustments to revenue and COGS)
+[Payout Fee Fix (FEE-FIX-01)]
+    └──requires──> [Existing payout sync v1.0]
+    └──feeds accuracy into──> [Waterfall Chart] (fee step is trustworthy)
 
-Products/Variants Sync
-  → SKU list for COGS entry UI
-  → Variant ID → SKU mapping for CSV import
+[Waterfall Chart (CHART-01)]
+    └──requires──> [Existing per-order profit data v1.0]
+    └──requires──> [Existing store-level P&L calculations v1.0]
+    └──enhanced by──> [Payout Fee Fix] (accurate fee step)
+    └──enhanced by──> [Meta Ads (ADS-01)] (ad spend step)
+    └──enhanced by──> [Google Ads (ADS-02)] (ad spend step)
 
-COGS Per Variant (manual or CSV or auto-import)
-  → Profit per order (line item × quantity × cost)
-  → Profit per product
-  → Margin %
+[Margin Alerts (ALERT-01)]
+    └──requires──> [Existing per-SKU margin data v1.0]
+    └──requires──> [Existing COGS data v1.0]
+    └──INDEPENDENT of──> [Fee Fix, Waterfall, Ads]
 
-Fee Rate Configuration (Shopify plan + gateway)
-  → Transaction fee per order
-  → Combined with Shopify Payments balance transactions for accuracy
+[Meta Ads (ADS-01)]
+    └──requires──> [Meta developer app + Marketing API access]
+    └──enhances──> [Waterfall Chart] (add ad spend step)
+    └──enhances──> [Store P&L KPI cards] (add spend line)
 
-[All of the above] → Store-level P&L
-[All of the above] → Date-range filtered views
-[All of the above] → Best/worst product rankings
+[Google Ads (ADS-02)]
+    └──requires──> [Google developer token approval — external, weeks-long]
+    └──follows──> [Meta Ads (ADS-01)] (share connection UI patterns)
+    └──enhances──> [Waterfall Chart] (add Google spend step)
+
+[True Profit per Campaign (ADS-03)]
+    └──requires──> [Meta Ads (ADS-01)] OR [Google Ads (ADS-02)]
+    └──requires──> [Per-order UTM attribution from CustomerJourneySummary]
+    └──requires──> [Existing per-order profit data v1.0]
 ```
 
----
+### Dependency Notes
 
-## MVP Recommendation
-
-**Build these first (Phase 1):**
-
-1. Orders + Products sync from Shopify API (foundation for everything)
-2. Manual COGS entry per SKU with persist to DB
-3. Fee calculation engine (configurable Shopify plan rates + gateway detection)
-4. Store-level P&L overview with KPI cards (revenue, profit, margin %, orders)
-5. Date range filter (daily/weekly/monthly/custom)
-6. Profit per order table (sortable, searchable)
-7. Profit per product/SKU table with best/worst ranking
-8. Line chart: profit over time
-
-**Defer (Phase 2+):**
-
-- CSV COGS import — useful but not blocking MVP value; manual entry suffices for validation
-- Payout reconciliation — high complexity, niche use case for early users
-- Margin alerts — valuable but requires proven baseline metrics first
-- Auto-import from Shopify `costPerItem` — quick win, but only after manual entry is working
-- Ad spend integration — explicitly Phase 2 per PROJECT.md
-- Waterfall chart — nice differentiator but chart library renders it only after data model is solid
-
-**The 10-minute-to-value constraint drives Phase 1 scope:** A merchant must be able to install, enter their top 5 COGS, and see real profit numbers before they leave. Everything else is secondary to that moment.
+- **Payout Fee Fix before Waterfall**: If waterfall shows a "Shopify Fees" bar using estimated rates, it will be wrong for Shopify Payments stores. Fix fees first, then the chart is trustworthy.
+- **Meta before Google**: Meta OAuth is standard — no external gating. Google requires developer token approval from Google. Ship Meta first; apply for Google token in parallel.
+- **Margin Alerts are independent**: No dependency on fee fix, waterfall, or ads. Can be sequenced first if desired.
+- **Waterfall + Ads integration payoff**: The waterfall chart becomes genuinely powerful only after ads spend is integrated. The two features should be positioned as a pair in the release.
 
 ---
 
-## Gaps and Uncertainties
+## MVP Definition for v2.0
 
-| Area | Gap | Confidence Risk | How to Resolve |
-|---|---|---|---|
-| Shopify Payments per-transaction fee field | `balance/transactions` has a `fee` field; unclear if it maps 1:1 to a single order | MEDIUM | Test against a real Shopify Payments store during development |
-| Third-party gateway exact rates | Rates for Stripe, PayPal, Afterpay etc. change; hardcoding is fragile | MEDIUM | Allow merchant to configure their own gateway rate; don't rely on a hardcoded table alone |
-| Shopify `costPerItem` field population rate | Unknown what % of target merchants actually fill this in Shopify admin | LOW | Survey or instrument; assume low, treat as bonus not primary path |
-| Rate limit impact on historical sync | Large stores with 10K+ orders may hit REST API rate limits on initial sync | MEDIUM | Use cursor-based pagination and GraphQL bulk operations for initial backfill |
-| Refund COGS handling | When an order is refunded, COGS should reverse — Shopify refund objects have line items but cost must come from app's stored COGS | MEDIUM | Model refunds explicitly in DB schema; don't just subtract revenue |
+### Launch With (v2.0)
+
+Minimum to close the three retention risks identified in the milestone brief (accuracy, UX differentiation, competitive parity):
+
+- [ ] **Payout Fee Fix** — Core accuracy risk. Verify and fix before any other v2.0 feature ships. Broken fees undermine the entire value proposition.
+- [ ] **Per-order Waterfall Chart** — The "aha moment" UX. Drill from existing order table into visual cost decomposition. Low complexity given existing Recharts usage.
+- [ ] **Store-level Waterfall Chart** — Aggregate view for selected date range. Reuses existing KPI calculations. Very low incremental complexity.
+- [ ] **Margin Alerts (in-dashboard only)** — Configurable threshold, badge on Products nav, banner showing at-risk SKUs. No email alerts in v2.0.
+- [ ] **Meta Ads account connection + total spend** — Account-level spend deducted from P&L. Campaign breakdown as second step. Reaches competitive parity.
+- [ ] **Meta campaign-level spend breakdown** — Small incremental step after account-level. Adds meaningful value (which campaign burned the budget).
+
+### Add After v2.0 Ships (v2.1)
+
+- [ ] **Google Ads integration** — Gated on developer token approval. Start the application process during v2.0 development.
+- [ ] **Ad spend step in waterfall chart** — Connects ads integration to the waterfall visualization. The unifying "north star" chart.
+- [ ] **Per-order Meta attribution via UTM** — Complex and imperfect but directionally useful. `CustomerJourneySummary.firstVisit.utmParameters`.
+- [ ] **True profit per campaign** — Requires UTM attribution working first.
+- [ ] **Email margin alerts** — Requires adding email sending infrastructure (Sendgrid/Postmark). Good retention feature but not v2.0.
+
+### Defer to v3+ (Future Consideration)
+
+- [ ] **Payout reconciliation view** — Accountant-focused. High complexity, niche demand at current price point.
+- [ ] **SKU-level waterfall** — Build after per-order and store-level are validated.
+- [ ] **Per-SKU threshold overrides for alerts** — Reduces false positives but adds UI complexity. Validate demand first.
+- [ ] **Margin trend alerts** (alerting before threshold is crossed) — Requires historical per-SKU tracking infrastructure.
+- [ ] **Slack/webhook alerts** — Power feature, scope creep for v2.x.
+
+---
+
+## Feature Prioritization Matrix
+
+| Feature | User Value | Implementation Cost | Priority |
+|---------|------------|---------------------|----------|
+| Payout fee fix | HIGH (accuracy = trust) | MEDIUM | P1 |
+| Store-level waterfall chart | HIGH (unifying visualization) | LOW | P1 |
+| Per-order waterfall chart | HIGH (drill-down insight) | MEDIUM | P1 |
+| Margin alerts (in-dashboard) | HIGH (proactive insight) | LOW | P1 |
+| Meta Ads account connection + total spend | HIGH (competitive parity) | MEDIUM | P1 |
+| Meta campaign-level breakdown | MEDIUM | LOW (incremental) | P1 |
+| Google Ads integration | HIGH (competitive parity) | HIGH (gated on developer token) | P2 |
+| Ad spend step in waterfall | HIGH (completes the chart) | LOW (incremental once ads exist) | P2 |
+| Per-order Meta attribution (UTM) | MEDIUM (imperfect) | HIGH | P2 |
+| True profit per campaign | HIGH | HIGH | P2 |
+| Email margin alerts | MEDIUM | HIGH (new infra) | P3 |
+| Payout reconciliation view | LOW (niche) | HIGH | P3 |
+
+**Priority key:**
+- P1: Must have for v2.0 launch
+- P2: Target v2.1 — start Google token approval now
+- P3: Defer until validated demand
+
+---
+
+## Competitor Feature Analysis
+
+| Feature | Triple Whale | BeProfit | TrueProfit | Our v2.0 Approach |
+|---------|--------------|----------|------------|-------------------|
+| Profit decomposition / waterfall | Contribution margin per order with full cost breakdown (COGS, shipping, gateway fees, ad spend) | "Cost breakdown" view — how each category reduces profit | Real-time net profit dashboard, per-order cost breakdown | Recharts waterfall chart: per-order + store-level. Simpler than Triple Whale's full suite but captures the core insight at lower complexity. |
+| Margin alerts | Not a primary feature — focus is on ad attribution | Flags low-margin products in reports | Product-level profitability analysis | In-dashboard banner + nav badge. Configurable threshold. More explicit and actionable than TrueProfit's approach. |
+| Meta Ads | Primary differentiator — first-party pixel + CAPI + Insights API | Yes, multi-platform | Yes, multi-platform (Meta, Google, TikTok, Amazon) | Spend pull via Marketing API (read-only). Per-order attribution via UTM best-effort. Honest about attribution limitations — no pixel/CAPI scope creep. |
+| Google Ads | Yes | Yes | Yes | Start approval in parallel with v2.0. Ship after Meta. |
+| Payout fee accuracy | Tracks transaction fees as a cost component | Tracks transaction fees | Tracks transaction fees | Exact fees from `ShopifyPaymentsBalanceTransaction` — more precise than competitors who estimate from rate tables. Potential differentiation on accuracy narrative. |
 
 ---
 
 ## Sources
 
-- Training data: Triple Whale product (trytriplewhale.com), BeProfit (beprofit.co), Lifetimely (lifetimely.io), Peel Insights — observed feature sets as of training cutoff August 2025. **Confidence: MEDIUM** (product features change frequently; verify current state)
-- Shopify Admin REST API documentation — Orders, Transactions, Products, Shopify Payments endpoints. **Confidence: HIGH** (stable API surface; verify field-level details during implementation)
-- Shopify GraphQL Admin API — `inventoryItem.unitCost` field. **Confidence: HIGH** (official API)
-- Shopify fee structure — plan pricing and gateway rates. **Confidence: MEDIUM** (rates accurate as of training data; verify before shipping fee calculator)
-- r/shopify merchant community patterns — feature expectations and pain points. **Confidence: MEDIUM** (consistent signal across many threads)
+- [ShopifyPaymentsBalanceTransaction - GraphQL Admin](https://shopify.dev/docs/api/admin-graphql/latest/objects/ShopifyPaymentsBalanceTransaction) — HIGH confidence
+- [ShopifyPaymentsPayout - GraphQL Admin](https://shopify.dev/docs/api/admin-graphql/latest/objects/shopifypaymentspayout) — HIGH confidence
+- [New fees and net fields for balance transactions - Shopify changelog, 2025-04](https://shopify.dev/changelog/new-fees-and-net-fields-for-balance-transactions) — HIGH confidence
+- [Additions to GraphQL API for Shopify Payments payouts and balance transactions](https://shopify.dev/changelog/additions-to-the-graphql-api-for-shopify-payments-payouts-and-balance-transactions) — HIGH confidence
+- [CustomerJourneySummary - GraphQL Admin](https://shopify.dev/docs/api/admin-graphql/latest/objects/customerjourneysummary) — HIGH confidence
+- [CustomerVisit - GraphQL Admin](https://shopify.dev/docs/api/admin-graphql/latest/objects/CustomerVisit) — HIGH confidence
+- [Recharts Waterfall Example](https://recharts.github.io/en-US/examples/Waterfall/) — HIGH confidence
+- [Meta Ads API setup guide - AdManage.ai](https://admanage.ai/blog/meta-ads-api) — MEDIUM confidence (third-party but detailed, consistent with official docs)
+- [Meta Ads API June 2025 attribution changes - Windsor.ai](https://windsor.ai/documentation/facebook-ads-meta-api-updates-june-10-2025/) — MEDIUM confidence
+- [Google Ads API v20 announcement - Google Developer Blog, June 2025](https://ads-developers.googleblog.com/2025/06/announcing-v20-of-google-ads-api.html) — HIGH confidence
+- [google-ads-api npm package v23.0.0](https://www.npmjs.com/package/google-ads-api) — HIGH confidence
+- [Triple Whale Summary Dashboard metrics library](https://kb.triplewhale.com/en/articles/6127778-summary-dashboard-metrics-library) — HIGH confidence (official docs)
+- [Triple Whale Net Profit formula](https://triplewhale.readme.io/docs/net-profit) — HIGH confidence
+- [GoProfit Smart Alerts - Shopify App Store](https://apps.shopify.com/go-profit) — MEDIUM confidence
+- [Margin Insight - Shopify App Store](https://apps.shopify.com/margininsight) — MEDIUM confidence
+- [Shopimize Negative Margin Alert - Shopify App Store](https://apps.shopify.com/shopimize) — MEDIUM confidence
+- [Attribution mismatch analysis Meta vs Shopify, 2026](https://attribuly.com/blogs/shopify-attribution-mismatches-meta-vs-tiktok-2026/) — MEDIUM confidence
+- [Capturing UTM Parameters in Shopify orders (2025)](https://trackfunnels.com/capture-utm-parameters-shopify-order-webhook/) — MEDIUM confidence
+
+---
+*Feature research for: Shopify Profit Analytics App v2.0*
+*Covers: Payout Fee Fix, Waterfall Chart, Margin Alerts, Meta Ads Integration, Google Ads Integration*
+*Researched: 2026-03-18*

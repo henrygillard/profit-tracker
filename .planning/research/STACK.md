@@ -1,344 +1,185 @@
-# Technology Stack: Profit Analytics Dashboard UI Layer
+# Stack Research
 
-**Project:** Shopify Profit Tracker — React frontend milestone
-**Researched:** 2026-03-10
-**Confidence Note:** All external research tools (WebSearch, WebFetch, Bash) were unavailable in this session. All findings are based on training knowledge (cutoff August 2025) plus inference from the existing project's Shopify API version (2025-10), which places the scaffold firmly in the post-App-Bridge-4 era. Confidence levels reflect this constraint.
-
----
-
-## Context: What Already Exists
-
-The existing scaffold is vanilla Node.js + Express with no frontend build toolchain. The relevant existing constraints:
-
-- Shopify API version `2025-10` (from `shopify.app.profit-tracker.toml`)
-- `embedded = true` already set in TOML
-- CSP `frame-ancestors` headers already set per shop in `server.js`
-- No `package.json` build scripts beyond `prisma` commands
-- Deployed via Docker on Railway; static files served from `/public`
-
-The new layer adds: React SPA, Shopify embedded app wiring, Polaris UI components, and a charting library — all built separately and served as static files from Express.
+**Domain:** Shopify Profit Analytics — v2.0 new feature additions
+**Researched:** 2026-03-18
+**Confidence:** MEDIUM overall (Meta SDK confirmed current; Google Ads API Node.js community-maintained only; `google-auth-library` Node 16 compatibility requires verification at install time)
 
 ---
 
-## Recommended Stack
+## Context: What Already Exists (Do Not Change)
 
-### App Bridge
+- **Backend:** Node.js v16.20.2, Express, CommonJS (`require()` throughout)
+- **Database:** PostgreSQL via Prisma `^5.22.0`
+- **Frontend:** React 18.2 + Vite 4 + Recharts `^3.8.0` (already in `web/package.json`)
+- **Auth:** `jsonwebtoken ^9.0.3` — Shopify JWT validation in place on all `/api/*` routes
+- **Other backend:** `node-cron ^4.2.1`, `express-rate-limit ^7.5.0`, `multer ^2.1.1`, `csv-parser ^3.2.0`
+- **Tests:** Jest 29 with manual `__mocks__/prisma.js`
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `@shopify/app-bridge-react` | ^4.x (latest) | Embedded app context provider, navigation, session token | The React-specific bridge package for embedded apps |
+Deployment is Railway via Docker. Any new package must run on Node 16.20.2.
 
-**CRITICAL — App Bridge architecture changed in 2024:**
-Shopify shipped "App Bridge CDN" / "App Bridge native" starting with API versions ~2024-04+. In this model:
-- The Shopify Admin *injects* App Bridge via a `<script>` tag in the outer page frame
-- The embedded app's iframe receives the App Bridge `window.shopify` global automatically
-- `@shopify/app-bridge-react` wraps this injected bridge in a React context provider
-
-The practical implications:
-1. You do NOT need to manually load an App Bridge script tag in your HTML
-2. You DO still install `@shopify/app-bridge-react` as an npm package for React hooks (`useAppBridge`, `useNavigate`, etc.)
-3. The `AppProvider` from `@shopify/app-bridge-react` replaces the old `@shopify/app-bridge` direct initialization pattern
-
-**Confidence: MEDIUM** — Architecture verified by training data from Shopify docs pre-Aug 2025. The 2025-10 API version in this project confirms it falls within the modern App Bridge era. Exact package version should be verified against `npm show @shopify/app-bridge-react version` before coding.
-
-**What NOT to use:**
-- `@shopify/app-bridge` (the non-React package) — still exists but for non-React use cases; use the React package
-- `@shopify/app-bridge` v2.x patterns (manual `createApp()` calls, `getSessionToken()` directly) — deprecated; the React package handles this
-- CDN script tags to load App Bridge manually — handled by Shopify admin automatically for 2024+ API versions
-
-### Session Token Authentication (API calls from React)
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `@shopify/app-bridge-react` hooks | (included above) | Get session tokens for API calls | The only Shopify-sanctioned way to authenticate embedded app API calls |
-
-Pattern for authenticating React → Express API calls:
-
-```javascript
-// In React component
-import { useAppBridge } from '@shopify/app-bridge-react';
-
-const shopify = useAppBridge();
-const token = await shopify.idToken(); // Gets current session token
-// Pass as Bearer token to your Express API
-```
-
-Express then verifies this token against Shopify's JWKS endpoint. This is the replacement for the old cookie-based session approach in embedded apps.
-
-**Confidence: MEDIUM** — Standard pattern as of 2024 Shopify docs.
-
-### React Setup (No Meta-Framework)
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| React | ^18.x | UI component library | Current stable; 19 was in RC as of Aug 2025, use 18 until 19 is stable |
-| ReactDOM | ^18.x | DOM rendering | Paired with React |
-| Vite | ^5.x | Build tool | Zero-config, fast HMR for development, optimized production builds; no framework lock-in |
-| `@vitejs/plugin-react` | ^4.x | Vite React plugin | Babel-based React transform for Vite; mature and stable |
-
-**Why Vite over alternatives:**
-- **Not Create React App (CRA):** Officially deprecated and unmaintained since 2023
-- **Not Webpack directly:** Significantly more configuration boilerplate for equivalent output; Vite internally uses Rollup for production which is well-optimized
-- **Not Next.js/Remix:** These are full meta-frameworks; this project has Express already; adding Next.js would mean running two servers or abandoning Express, neither acceptable per constraints
-- **Not Parcel:** Less ecosystem traction for React apps than Vite; less control over output for embedded app use case
-
-Vite builds to a `/dist` folder that Express serves as static files — clean separation.
-
-**Confidence: HIGH** — Vite as the non-framework React build tool is the clear community consensus as of 2025.
-
-### Shopify Polaris
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `@shopify/polaris` | ^13.x | UI component library | Required for Shopify admin look-and-feel compliance; cards, data tables, navigation, form components |
-
-**Why Polaris is mandatory (not optional):**
-Shopify's App Store review process increasingly flags embedded apps that don't use Polaris. Merchants expect the admin UI to feel native. The dashboard pages (profit overview, product table, order list) map directly to Polaris `DataTable`, `Card`, `DatePicker`, and `Select` components — no custom CSS work required.
-
-**Polaris v13 changes from v12:**
-- Token-based design system (CSS custom properties)
-- Removed deprecated `Stack` component in favor of `BlockStack`/`InlineStack`
-- Updated color system aligned with Shopify's design tokens
-
-**What NOT to use:**
-- Custom CSS frameworks (Tailwind, Bootstrap, etc.) alongside Polaris — Polaris uses its own token-based system; mixing creates visual inconsistency and token conflicts
-- `@shopify/polaris-tokens` directly unless you need advanced theming — the main Polaris package includes tokens
-
-**Confidence: MEDIUM** — Polaris v13 was current as of Aug 2025. Verify `npm show @shopify/polaris version` before installing; v14 may be available.
-
-### Charting Library
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| Recharts | ^2.x | Profit/margin time series, bar charts, composed charts | Best fit for this use case — see rationale below |
-
-**Decision: Recharts over alternatives**
-
-This is the most contested decision in the stack. Here is the evidence-based rationale:
-
-**Recharts — RECOMMENDED**
-- Built on D3 (data-driven, accurate scales and axes) but abstracts D3's complexity
-- React-native: components are real React components, not imperative D3 mutations
-- SVG-based: sharp at all zoom levels, no canvas blurriness on retina
-- `ComposedChart` supports overlaying bar + line charts — exactly what profit dashboards need (revenue bars + margin % line on same chart)
-- TypeScript types included
-- ~500KB unpacked, tree-shakeable to far less in practice
-- Active maintenance: v2.x series has 4+ years of production use
-
-**Why not Chart.js / react-chartjs-2:**
-- Chart.js is canvas-based (blurry on retina, can't apply CSS styles to chart elements)
-- `react-chartjs-2` is a thin wrapper with an imperative Chart.js config object, not idiomatic React
-- Animation and tooltip customization requires reaching into Chart.js internals
-
-**Why not Nivo:**
-- High-quality library, but significantly heavier (~2x bundle size vs Recharts)
-- Polaris design tokens don't translate easily to Nivo's style system
-- More complexity than needed for a standard profit dashboard
-
-**Why not Visx (Airbnb):**
-- Low-level D3 wrapper, not a component library — requires significant custom work
-- Appropriate for custom visualization work, not a standard analytics dashboard
-
-**Why not Victory:**
-- Smaller ecosystem, less active maintenance than Recharts
-- More opinionated layout system that conflicts with Polaris Card layouts
-
-**Confidence: HIGH** — Recharts is the dominant choice for React-native charting as of 2025. Pattern is stable.
-
-### Supporting Libraries
-
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| `date-fns` | ^3.x | Date manipulation for range filters | Use for date range calculation, formatting in dashboard filters; pairs well with Polaris DatePicker |
-| `@tanstack/react-query` | ^5.x | Server state management (API data fetching, caching, loading/error states) | Use for all Express API calls from React; eliminates manual fetch boilerplate |
-| `react-router-dom` | ^6.x | Client-side routing between dashboard views | Use if multiple pages (Overview, Products, Orders, Settings); optional if single-page tabs |
-
-**Why TanStack Query (React Query):**
-The profit dashboard has multiple data-fetching concerns: orders sync status, products list, profit overview by date range. React Query handles caching, background refetch, loading states, and error states with minimal boilerplate. This is substantially less code than manual `useEffect` + `useState` fetch patterns, and avoids common bugs (race conditions, stale closures).
-
-**Why date-fns over moment.js:**
-Moment.js is officially deprecated. date-fns is tree-shakeable (import only what you use), immutable (no surprise mutations), and TypeScript-first.
-
-**Why react-router-dom v6 (optional):**
-If the app has more than one "page" (e.g., Dashboard, Products, Settings), client-side routing avoids full page reloads. Polaris `Navigation` component works well with react-router's `NavLink`. However, if the entire UI fits in a single page with tab-based navigation, skip react-router entirely and use Polaris `Tabs`.
+The Recharts version already installed (`^3.8.0`) is sufficient for the waterfall chart. No frontend package changes are needed.
 
 ---
 
-## How to Serve React from Express
+## Recommended Stack Additions
 
-This is the Express + Vite integration pattern — no meta-framework required.
+### New Backend Dependencies
 
-### Build Architecture
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| `facebook-nodejs-business-sdk` | `^24.0.1` | Meta Marketing API: fetch ad account insights, campaign-level daily spend | Official Meta-published SDK. No `engines.node` field — no declared minimum Node version, safe on Node 16. CommonJS-compatible; fits existing `require()` codebase. Wraps Graph API v22 calls with typed objects. |
+| `google-ads-api` | `^23.0.0` | Google Ads API: fetch campaign spend via GAQL queries | Best available Node.js option — community-maintained by Opteo but the most complete solution (323 stars, actively maintained, supports Google Ads API v19/v23). Google has no official Node.js client. Node 16 confirmed tested by maintainer. |
+| `google-auth-library` | `^10.6.2` | Google OAuth2: exchange auth code for tokens, store and auto-refresh refresh tokens | Official Google library. `google-ads-api` uses it internally; surface it directly in the OAuth callback route to exchange codes and persist credentials. Auto-refreshes expired access tokens on every API call once `refresh_token` is stored. |
 
-```
-profit-tracker/
-├── server.js                 # Existing Express server (unchanged routing)
-├── client/                   # New: React app source
-│   ├── index.html            # Vite entry point HTML
-│   ├── src/
-│   │   ├── main.jsx          # React root, AppProvider wrapping
-│   │   └── App.jsx           # Root component
-│   ├── vite.config.js        # Build config: outDir → ../public/app
-│   └── package.json          # Client-only dependencies
-└── public/
-    └── app/                  # Vite build output, served as static files
-        ├── index.html
-        └── assets/
-            ├── main.[hash].js
-            └── main.[hash].css
-```
+### No New Frontend Dependencies
 
-### Express Static Serving
+| Feature | Approach | Rationale |
+|---------|----------|-----------|
+| Waterfall chart (CHART-01) | Existing `recharts ^3.8.0` `Bar` with `[low, high]` range data | Recharts has no native waterfall type but ships its own waterfall example using stacked `Bar` components with range values and a custom `shape` prop. Zero new packages. |
+| Margin alert banners (ALERT-01) | Conditional JSX with existing Polaris CDN components | Alert/Banner patterns already available via Polaris CDN loaded in `index.html`. |
 
-In `server.js`, add one route that serves the React SPA for the `/admin` path:
+### No New Shopify API Changes
 
-```javascript
-// Serve Vite build output as static files
-app.use('/app', express.static(path.join(__dirname, 'public/app')));
-
-// SPA fallback: all /admin/* requests serve the React index.html
-app.get('/admin', (req, res) => {
-  // Existing session check stays here
-  // If session valid, serve the SPA entry point
-  res.sendFile(path.join(__dirname, 'public/app/index.html'));
-});
-```
-
-The existing session check on `GET /admin` stays in Express — the server validates the session before serving the SPA, keeping the auth logic server-side.
-
-### Vite Config (Key Settings)
-
-```javascript
-// client/vite.config.js
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-
-export default defineConfig({
-  plugins: [react()],
-  build: {
-    outDir: '../public/app',
-    emptyOutDir: true,
-  },
-  // base must match the Express static serving path
-  base: '/app/',
-});
-```
-
-### Development Workflow
-
-In development, run two processes:
-1. Express server: `npm run dev` (existing, port 3000)
-2. Vite dev server: `npm run client:dev` (port 5173, with proxy to Express)
-
-Configure Vite proxy to forward API calls to Express during development:
-
-```javascript
-server: {
-  proxy: {
-    '/api': 'http://localhost:3000',
-  }
-}
-```
-
-In production (Docker/Railway), only Express runs. The `npm run client:build` step (added to Dockerfile) compiles the React app to `public/app/` before `node server.js` starts.
-
-### Docker Build Step Addition
-
-The Dockerfile needs one additional step:
-
-```dockerfile
-# Install client dependencies and build
-WORKDIR /app/client
-RUN npm install
-RUN npm run build
-WORKDIR /app
-```
-
-**Confidence: HIGH** — This is a well-established pattern for Express + Vite SPAs. No framework magic; straightforward static file serving.
-
----
-
-## Alternatives Considered
-
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| Build tool | Vite 5 | Create React App | CRA officially deprecated 2023, unmaintained |
-| Build tool | Vite 5 | Webpack 5 direct | ~200 lines of config vs ~15 for Vite; no benefit |
-| Build tool | Vite 5 | Next.js | Full framework requiring its own server; conflicts with existing Express |
-| Build tool | Vite 5 | Remix | Same issue as Next.js; needs its own server adapter |
-| Charting | Recharts | Chart.js | Canvas-based, not React-native, poor retina quality |
-| Charting | Recharts | Nivo | 2x bundle size, overkill for standard dashboard |
-| Charting | Recharts | Visx | Low-level, requires significant custom work |
-| Date utils | date-fns | moment.js | Officially deprecated, not tree-shakeable |
-| Date utils | date-fns | dayjs | Similar quality; date-fns more TypeScript-native |
-| Server state | TanStack Query | Redux Toolkit | Redux is overkill for API data fetching; RTK Query adds learning curve |
-| Server state | TanStack Query | SWR | Both are good; TanStack Query has more features (mutations, devtools, offline) |
-| UI framework | Polaris | Tailwind + headless | Polaris is required for Shopify admin look-and-feel; custom CSS fights Shopify's design system |
+| Feature | Approach |
+|---------|----------|
+| Payout fee fix (FEE-FIX-01) | Existing Shopify GraphQL Admin API — update query in `lib/syncPayouts.js` to use `ShopifyPaymentsBalanceTransaction.fee` (MoneyV2) + `associatedOrder` fields, which provide confirmed 1:1 payout-to-order linkage in the `2025-10` schema |
 
 ---
 
 ## Installation
 
-### Client-side (new `client/` directory)
-
 ```bash
-# Core React + build
-npm install react@^18 react-dom@^18
-npm install -D vite@^5 @vitejs/plugin-react@^4
-
-# Shopify embedded app
-npm install @shopify/app-bridge-react@^4
-npm install @shopify/polaris@^13
-
-# Data & utilities
-npm install recharts@^2
-npm install date-fns@^3
-npm install @tanstack/react-query@^5
-
-# Routing (include only if multi-page)
-npm install react-router-dom@^6
+# From repo root — backend only
+npm install facebook-nodejs-business-sdk@^24.0.1 google-ads-api@^23.0.0 google-auth-library@^10.6.2
 ```
 
-### Server-side additions (existing `package.json`)
-
-No new server dependencies are required. Express already serves static files. The Vite build output is just HTML/JS/CSS that Express hands to the browser.
+No changes to `web/package.json`.
 
 ---
 
-## CSP Header Update Required
+## Token Storage: New Prisma Model
 
-The existing CSP header in `server.js` will need updating. Currently it only allows frame-ancestors. The React app will load external resources (fonts from Shopify CDN, Polaris icons) that need to be whitelisted.
+Store OAuth credentials for Meta and Google in a new table. Encrypt tokens at rest using Node's built-in `crypto` module (AES-256-GCM) — no new package needed.
 
-Minimum additions needed:
-- `script-src`: allow the Shopify CDN that injects App Bridge
-- `style-src`: allow inline styles (Polaris uses them) and Shopify CDN stylesheets
-- `img-src`: allow Shopify CDN for product images and Polaris icons
-- `connect-src`: allow Shopify API endpoints for GraphQL/REST calls from the browser
+```prisma
+model AdConnection {
+  id             Int       @id @default(autoincrement())
+  shop           String
+  platform       String    // "meta" | "google"
+  accountId      String    @map("account_id")      // Meta ad account ID or Google customer ID
+  encryptedToken String    @map("encrypted_token") // AES-256-GCM ciphertext (base64)
+  tokenIv        String    @map("token_iv")         // base64-encoded IV for decryption
+  tokenTag       String    @map("token_tag")        // base64-encoded GCM auth tag
+  tokenExpiry    DateTime? @map("token_expiry")     // null = non-expiring (Meta standard access)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
-This is an existing concern noted in `CONCERNS.md` and must be addressed before the React app will function in the embedded iframe context.
+  @@unique([shop, platform])
+  @@map("ad_connections")
+}
+```
 
-**Confidence: HIGH** — CSP restrictions are a known, documented requirement for Shopify embedded apps.
+Encryption key: `ADS_ENCRYPTION_KEY` env var (32 bytes, hex-encoded). Use `crypto.createCipheriv('aes-256-gcm', key, iv)`. No new package.
 
 ---
 
-## Open Questions (Verify Before Coding)
+## Integration Patterns by Feature
 
-| Question | How to Verify | Impact if Wrong |
-|----------|--------------|-----------------|
-| Is `@shopify/app-bridge-react` v4 still the correct package name in 2026? | `npm show @shopify/app-bridge-react` | Could be renamed or consolidated |
-| Is Polaris at v13 or v14+ now? | `npm show @shopify/polaris version` | API changes in major versions |
-| Does the 2025-10 API version require any specific App Bridge configuration? | Shopify changelog for 2025-10 | Could affect session token approach |
-| Is `shopify.idToken()` the correct method for session tokens (vs `getSessionToken`)? | Shopify App Bridge React docs | Auth will break if wrong |
+**Meta Ads OAuth + Sync (ADS-01):**
+
+1. Backend initiates redirect to `https://www.facebook.com/v22.0/dialog/oauth` with scopes `ads_read,ads_management`
+2. Callback receives code, calls Graph API to exchange for short-lived token, then calls `https://graph.facebook.com/oauth/access_token?grant_type=fb_exchange_token` for a long-lived token (non-expiring for Standard Marketing API access)
+3. Store encrypted long-lived token in `AdConnection` table
+4. Sync job uses `facebook-nodejs-business-sdk`: `AdAccount.getInsights()` with date range and `fields: ['campaign_name', 'spend', 'date_start']`
+5. Ad spend attribution to orders: join by `utm_campaign` / `utm_source` present in Shopify order `landingPageUrl` or `referringSite` field — best-effort UTM matching, not pixel-level
+
+**Google Ads OAuth + Sync (ADS-02):**
+
+1. Backend initiates redirect to Google OAuth2 endpoint with scope `https://www.googleapis.com/auth/adwords` and `access_type=offline` (required to receive refresh token)
+2. `google-auth-library` `OAuth2Client.getToken(code)` exchanges code for `{ access_token, refresh_token, expiry_date }`
+3. Store encrypted `refresh_token` in `AdConnection`; `google-auth-library` auto-acquires and refreshes access tokens on each call
+4. Requires a **Google Ads developer token** (apply in Google Ads account — approval can take days; flag as dependency in requirements)
+5. `google-ads-api` `customer.report()` with GAQL: `SELECT campaign.name, metrics.cost_micros, segments.date FROM campaign WHERE segments.date BETWEEN ... AND ...`
+6. Attribution: same UTM-matching approach as Meta
+
+**Waterfall Chart (CHART-01):**
+
+Transform `OrderProfit` record into sequential `[base, top]` ranges:
+- Revenue bar: `[0, revenueNet]` — green
+- COGS bar: `[revenueNet - cogsTotal, revenueNet]` — red/orange (descending)
+- Fees bar: `[revenueNet - cogsTotal - feesTotal, revenueNet - cogsTotal]` — red
+- Shipping bar: next step down — red
+- Net profit bar: `[0, netProfit]` — blue/green depending on sign
+
+Use Recharts `BarChart` with each segment as a separate `Bar` component with `dataKey` returning `[low, high]` array. Custom `shape` prop colors bars. No new package — pure data transformation logic.
+
+**Margin Alerts (ALERT-01):**
+
+No new packages. Logic:
+- New `alertThreshold` column on `ShopConfig` (Decimal, nullable — null means disabled)
+- Backend route returns products/SKUs where `netProfit / revenueNet < threshold`
+- Frontend renders a Polaris `Banner` component (already available via CDN) when threshold-crossing products exist
+- Threshold configurable per shop via a settings input
+
+---
+
+## Alternatives Considered
+
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| `facebook-nodejs-business-sdk` | Raw `fetch` to Graph API endpoints | Only if SDK shows Node 16 runtime incompatibility — SDK is a thin wrapper over `node-fetch`, so falling back is straightforward |
+| `google-ads-api` (Opteo) | Raw REST to `googleads.googleapis.com` with `google-auth-library` | If `google-ads-api` has gRPC native binary issues in Railway's Docker environment. The library supports a REST transport mode as fallback. |
+| `google-auth-library` directly | `googleapis` meta-package | `googleapis` bundles 200+ Google APIs — 10x heavier. Use only `google-auth-library` (which `google-ads-api` depends on) for OAuth2 token handling. |
+| Node built-in `crypto` for token encryption | `jose`, `node-jose`, `crypto-js` | If you need JWE/JWT token format specifically. AES-256-GCM via Node built-in is sufficient for at-rest database encryption of refresh tokens. |
+
+---
+
+## What NOT to Use
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| `passport` + `passport-facebook` | Designed for user-session OAuth, not merchant-to-platform credential storage. Adds session middleware that fights the existing Shopify JWT auth model. | Hand-rolled OAuth redirect + callback using `facebook-nodejs-business-sdk` Graph API calls |
+| `passport-google-oauth20` | Same session-centric design problem | `google-auth-library` `OAuth2Client` directly |
+| `axios` (new backend install) | Not currently in backend `package.json`. Adding it for Meta/Google calls is redundant — `facebook-nodejs-business-sdk` handles its own HTTP internally. | SDK handles HTTP; `google-auth-library` handles Google auth |
+| Any second chart library (Victory, Nivo, Chart.js) | Waterfall chart is achievable with existing Recharts 3.8. Adding a second chart library adds bundle weight and CSS collision risk in Shopify's embedded iframe. | Recharts `Bar` with range `[low, high]` data + custom `shape` prop |
+| `ioredis` / Redis for token caching | Overkill. Ad token refresh is infrequent (per-sync-job). PostgreSQL already present. | `AdConnection` PostgreSQL table with encrypted token columns |
+| `node-fetch` explicit install | Node 18+ ships `fetch` natively, but Node 16 does not. However, `facebook-nodejs-business-sdk` bundles its own HTTP layer. Google calls go through `google-auth-library` which uses Node's `https`. No new HTTP client needed. | Existing SDK HTTP handling |
+
+---
+
+## Version Compatibility
+
+| Package | Node Requirement | Notes |
+|---------|-----------------|-------|
+| `facebook-nodejs-business-sdk@24.0.1` | No `engines` field declared | Expected safe on Node 16. Verify with `npm install --dry-run` before coding. |
+| `google-ads-api@23.0.0` | No `engines` field; Node 16 tested by maintainer | Uses gRPC + protobuf under the hood. Test native binary compilation on Railway Docker. If gRPC build fails, use the library's REST mode option. |
+| `google-auth-library@10.6.2` | Likely Node 18+ per CHANGELOG | **VERIFY FIRST.** Run `npm install google-auth-library@10` on Node 16.20.2 and check for `engines` error. If it fails, pin to `^9.15.1` (last confirmed Node 16 series). |
+| `recharts@3.8.0` | React 18 | Already installed. Waterfall via range `Bar` confirmed working. No upgrade needed. |
+| `prisma@5.22.0` + schema extension | Node 16 | Adding `AdConnection` model only — no version change. |
+
+**Critical pre-coding step:** On Node 16.20.2, run:
+```bash
+npm install google-auth-library@10 --dry-run
+```
+If `engines` incompatibility error appears, use `npm install google-auth-library@9` instead and update `google-ads-api` accordingly (it may pull its own compatible version of `google-auth-library` as a sub-dependency anyway).
 
 ---
 
 ## Sources
 
-- Training knowledge: Shopify App Bridge documentation (pre-August 2025)
-- Training knowledge: Shopify Polaris v12/v13 release notes
-- Training knowledge: Vite 5 official documentation
-- Training knowledge: Recharts v2 documentation
-- Training knowledge: TanStack Query v5 documentation
-- Existing project file: `shopify.app.profit-tracker.toml` (API version 2025-10 confirmed)
-- Existing project file: `server.js` (CSP header pattern confirmed)
-- **Note:** No live web lookups were possible in this session. All version numbers should be verified with `npm show [package] version` before starting implementation.
+- [facebook-nodejs-business-sdk GitHub](https://github.com/facebook/facebook-nodejs-business-sdk) — official Meta repo, v24.0.1 confirmed latest as of research date (CHANGELOG shows v24.0.1 most recent)
+- [facebook-nodejs-business-sdk npm](https://www.npmjs.com/package/facebook-nodejs-business-sdk) — package details, CommonJS confirmed
+- [Meta Marketing API Authentication docs](https://developers.facebook.com/docs/marketing-api/get-started/authentication/) — OAuth flow, `ads_read`/`ads_management` scopes, server-side token exchange
+- [Meta Access Token guide](https://developers.facebook.com/docs/facebook-login/guides/access-tokens/) — long-lived vs short-lived token behavior (MEDIUM confidence: non-expiring behavior for standard access verified in docs)
+- [google-ads-api npm (Opteo)](https://www.npmjs.com/package/google-ads-api) — v23.0.0, Google Ads API v19/v23 support
+- [Opteo google-ads-api README](https://github.com/Opteo/google-ads-api/blob/master/README.md) — OAuth credentials structure: `client_id`, `client_secret`, `developer_token`, `refresh_token`
+- [Google Ads API Client Libraries docs](https://developers.google.com/google-ads/api/docs/client-libs) — confirms no official Node.js library; `google-ads-api` listed as community option
+- [google-auth-library npm](https://www.npmjs.com/package/google-auth-library) — v10.6.2, official Google OAuth library, auto-refresh confirmed
+- [ShopifyPaymentsBalanceTransaction GraphQL reference](https://shopify.dev/docs/api/admin-graphql/latest/objects/ShopifyPaymentsBalanceTransaction) — `fee` (MoneyV2), `associatedOrder`, `sourceOrderTransactionId` fields confirmed for payout-to-order mapping
+- [Recharts waterfall example](https://recharts.github.io/en-US/examples/Waterfall/) — range Bar approach confirmed
+- [Recharts issue #7010](https://github.com/recharts/recharts/issues/7010) — no native waterfall type; community pattern is range Bar with custom shape
+
+---
+
+*Stack research for: Shopify Profit Analytics v2.0 new features*
+*Researched: 2026-03-18*

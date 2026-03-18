@@ -1,200 +1,200 @@
 # Project Research Summary
 
-**Project:** Shopify Profit Tracker — React frontend milestone
-**Domain:** Shopify embedded profit analytics dashboard ($10K–$200K/month merchants)
-**Researched:** 2026-03-10
-**Confidence:** MEDIUM (all research based on training knowledge through August 2025; no live web lookups available)
+**Project:** Shopify Profit Analytics App — v2.0 Milestone
+**Domain:** Shopify Embedded Analytics / Ad Platform Integration
+**Researched:** 2026-03-18
+**Confidence:** MEDIUM-HIGH overall
 
 ## Executive Summary
 
-This is a Shopify embedded analytics app that layers a profit calculation engine and React dashboard on top of an existing Express/PostgreSQL/Shopify OAuth scaffold. The established pattern for this class of product is: sync orders and products from Shopify into a local database, compute profit at sync time (not at query time), and serve pre-computed aggregates to a React frontend via authenticated API routes. Every serious competitor in this space (Triple Whale, BeProfit, Lifetimely) follows this architecture, and there are well-understood patterns for each layer. The recommended build order is database schema first, then sync service, then analytics API routes, then React frontend — each phase depends entirely on the previous one.
+The v2.0 milestone adds five targeted features to a shipping v1.0 app: payout fee accuracy fix, a waterfall profit decomposition chart, margin alerts, Meta Ads integration, and Google Ads integration. Research confirms all five are achievable with minimal new dependencies — three new backend packages, no frontend package changes, and two new Prisma models handle the bulk of the data layer. The existing architecture (Node.js 16 / Express / Prisma 5 / React 18 + Recharts 3.8) supports every feature without structural changes. This is a feature-addition milestone, not a rewrite.
 
-The highest-leverage stack choice is Vite + React 18 + Shopify Polaris + App Bridge 4.x for the frontend, with Recharts for charting and TanStack Query for API data fetching. Polaris is non-negotiable for Shopify App Store compliance. The key backend addition is a background sync service using webhooks as the primary trigger and 15-minute polling as a fallback, writing pre-computed profit fields to a normalized PostgreSQL schema. This approach keeps dashboard queries as simple single-table aggregates even at 10,000+ orders.
+The recommended build order is driven by data quality dependencies. The payout fee fix must come first because every downstream feature — the waterfall chart's Fees bar, margin alert accuracy, and eventual ad attribution — relies on correct per-order fee data. Meta Ads should precede Google Ads because Meta OAuth is standard while Google requires a developer token with an external approval process that can take weeks. Margin alerts are architecturally independent and can be interleaved. The waterfall chart and Meta Ads integration are best positioned together because the chart's "ad spend step" is the visual payoff for the entire milestone.
 
-The most dangerous risks are data correctness failures that erode merchant trust before the app ever gets traction: COGS NULL values silently treated as $0 (inflates profit), fee rates hardcoded without accounting for merchant plan tiers (systematically wrong for all merchants not on Basic), and COGS changes retroactively rewriting historical reports (destroys dashboard credibility). These must be correct from day one — they cannot be retrofitted once merchants have historical data. Secondary risks are app review blockers: the existing toml file requests 60+ scopes (will cause rejection) and GDPR webhook stubs are currently empty (guaranteed rejection). Both must be resolved before any App Store submission.
+Two architectural risks stand above all others. The Shopify Admin iframe prevents standard OAuth popup patterns — the solution is a top-level redirect (`window.top.location.href`) that is already proven in the v1.0 auth and billing confirmation flows. The Google Ads developer token has an external approval dependency that cannot be controlled with code; it must be applied for during the Meta Ads phase or it will block Phase 5 entirely. All remaining risks are code-level with clear, well-documented prevention strategies.
+
+---
 
 ## Key Findings
 
 ### Recommended Stack
 
-The frontend requires a separate `client/` directory with its own build pipeline. Vite 5 builds the React app to `public/app/` which Express serves as static files — clean separation with no meta-framework conflicts. App Bridge 4.x is injected by Shopify Admin's iframe context; the React package `@shopify/app-bridge-react` wraps it in a context provider and provides `useAppBridge()` hooks for session token retrieval. All Express API calls from React must include a fresh App Bridge session token (60-second TTL) as a Bearer header — do not cache tokens in state.
+The v1.0 stack (Node 16.20.2, Express, Prisma 5, React 18 + Recharts 3.8) supports all v2.0 features without version upgrades. Three new backend packages are needed. One pre-coding compatibility check is mandatory: run `npm install google-auth-library@10 --dry-run` on Node 16.20.2 before writing any Google Ads code; if it fails, fall back to `^9.15.1`. No frontend dependency changes are needed — the waterfall chart uses existing Recharts `Bar` with `[low, high]` range tuples. Token encryption uses Node's built-in `crypto` module with AES-256-GCM — no new package.
 
-**Core technologies:**
-- React 18 + Vite 5: SPA build pipeline, served as static files from Express — Vite is the unambiguous community standard for non-framework React in 2025; CRA is deprecated
-- `@shopify/app-bridge-react` ^4.x: Embedded app context, session tokens — required for Shopify Admin iframe integration
-- `@shopify/polaris` ^13.x: UI component library — required for App Store compliance and admin look-and-feel
-- Recharts ^2.x: Charting — React-native, SVG-based, ComposedChart supports bar+line overlays needed for profit dashboards
-- TanStack Query ^5.x: Server state management — eliminates fetch boilerplate, handles loading/error states, caching
-- `date-fns` ^3.x: Date manipulation — moment.js is deprecated; date-fns is tree-shakeable and TypeScript-first
-- `react-router-dom` ^6.x: Routing — conditional; only needed if multi-page; Polaris Tabs suffice for single-page layout
+**New backend dependencies:**
+- `facebook-nodejs-business-sdk@^24.0.1`: Meta Marketing API — official Meta SDK, CommonJS-compatible, no declared Node minimum, wraps Graph API v22
+- `google-ads-api@^23.0.0`: Google Ads GAQL queries — community-maintained by Opteo, Node 16 confirmed by maintainer, supports Google Ads API v19+; use REST transport fallback if gRPC native binary fails on Railway Docker
+- `google-auth-library@^10.6.2`: Google OAuth2 token exchange and auto-refresh — official Google library; verify Node 16 compatibility before Phase 5
 
-**Critical version note:** All version numbers should be verified with `npm show [package] version` before installation — package versions and names may have advanced since August 2025 training cutoff.
+**No new frontend dependencies.** Recharts waterfall via existing range `Bar` pattern. Polaris Banner/Badge for alerts available via existing CDN load.
 
 ### Expected Features
 
-**Must have (table stakes):**
-- Store-level P&L overview with KPI cards (revenue, COGS, fees, net profit, margin %) — every competitor leads with this
-- Date range filtering (daily/weekly/monthly/custom) — without this, the tool is useless for decision-making
-- Profit per order table (sortable) — merchants need to diagnose individual order losses
-- Profit per product/SKU table with best/worst ranking — the primary diagnostic unit
-- Manual COGS entry per variant — MVP path; required before any profit number is meaningful
-- Shopify fee calculation engine (plan-based transaction fees + gateway processing fees) — major profit leak invisible to merchants
-- Orders sync from Shopify API (foundation for all calculations)
-- Products/variants sync (for SKU mapping and COGS entry)
-- Line chart: profit over time — merchants expect visual trends, not just tables
+Research covers v2.0 scope only — v1.0 features are already shipped. The five new features form a coherent unit: accurate fees feed the waterfall chart, the chart makes the P&L visible, alerts close the proactive loop, and ads integration brings the full cost picture into the same view.
 
-**Should have (competitive differentiators):**
-- Shopify `costPerItem` auto-import — pre-populates COGS for merchants already using Shopify's cost field; quick win with high delight
-- CSV COGS import with SKU matching — essential for stores with 50+ variants; manual entry doesn't scale
-- Fee breakdown transparency — show exactly what Shopify/gateway took; high emotional value, low build cost once fee calc is done
-- Profit waterfall chart per order — visual decomposition of where revenue went; strong UX differentiator
-- Margin health alerts — "3 products below 10% margin" pushes insight rather than requiring the merchant to find it
-- COGS coverage indicator — "42 orders missing COGS, profit may be understated by $X" — prevents misleading data
+**Must have (v2.0 launch):**
+- Payout fee fix — exact Shopify Payments fees per order from `ShopifyPaymentsBalanceTransaction.fee`; "verified" vs. "estimated" indicator per order builds merchant trust
+- Store-level waterfall chart — Revenue → COGS → Fees → Shipping → Net Profit using existing KPI data; zero new API calls
+- Per-order waterfall chart — drill from existing OrdersTable row into per-order cost decomposition; all data already in DB
+- Margin alerts (in-dashboard only) — configurable threshold per shop, banner + nav badge, always-on negative-margin alert; eligibility gate required (7 days + 3 orders + known COGS)
+- Meta Ads account connection + total spend — account-level spend deducted from P&L; reaches competitive parity
+- Meta campaign-level spend breakdown — incremental step after account-level; low cost, meaningful added value
 
-**Defer (v2+):**
-- Ad spend integration (Meta/Google) — explicitly Phase 2 per PROJECT.md
-- Payout reconciliation view — high complexity, niche early-user use case; payouts don't map 1:1 to orders
-- Date-based COGS versioning — Lifetimely differentiator; significant complexity
-- Multi-currency handling beyond display conversion
-- Accounting software sync (QuickBooks, Xero) — manual CSV export sufficient for MVP
-- Customer LTV/cohort analysis — different product category entirely
+**Should have (v2.1 — gated on external dependencies):**
+- Google Ads integration — gated on developer token approval; start application during Phase 4
+- Ad spend step in waterfall chart — the payoff visualization connecting ads to the P&L; deliver after ads integration ships
+- Per-order Meta attribution via UTM — best-effort via `CustomerJourneySummary.firstVisit.utmParameters`; iOS privacy degrades coverage; label as estimated
 
-**Anti-features to avoid building:**
-- Multi-channel (Amazon, eBay) — doubles scope for <20% of users; stay Shopify-only
-- Real-time live order feed — profit analytics is inherently batch; "live" creates false precision
-- AI/ML profit forecasting — requires long history and merchant trust; not appropriate for v1
-- Inventory management — separate product category; COGS input is the correct stopping point
+**Defer (v3+):**
+- Email margin alerts — requires new email sending infrastructure (Sendgrid/Postmark) not in current stack
+- Payout reconciliation view — high complexity, accountant-niche at current price point
+- SKU-level waterfall — validate per-order and store-level first
+- True profit per campaign — requires UTM attribution working reliably first
 
 ### Architecture Approach
 
-The architecture adds three subsystems to the existing Express/PostgreSQL scaffold without replacing anything: a Data Ingestion Subsystem (background sync from Shopify API), an Analytics API Subsystem (authenticated Express routes serving pre-computed aggregates), and a React Frontend Subsystem (App Bridge embedded SPA). The critical design decision is pre-computing profit fields (`grossProfit`, `profitMargin`, `transactionFees`, `totalCOGS`) at sync time and storing them on the Order record. Dashboard queries then become simple single-table aggregates — fast even at 10,000+ orders. Real-time join-based computation at query time is the primary anti-pattern to avoid.
+All five features integrate into the existing Express / Prisma / React architecture through targeted additions. The most architecturally significant decision is the third-party OAuth approach inside the Shopify Admin iframe: `window.top.location.href` top-level redirect is the only reliable pattern, and it is already the established approach in the v1.0 codebase for Shopify OAuth and billing confirmation.
 
-**Major components:**
-1. Prisma Schema Extension — `Order`, `LineItem`, `Product`, `ProductVariant`, `COGS`, `SyncState` models; must be built first; everything depends on it
-2. Background Sync Service — webhook-triggered (primary) + 15-minute polling (fallback); writes pre-computed profit to DB; rate limit aware
-3. Analytics API Routes — session-token-authenticated Express routes serving aggregates; reads only from local DB; no Shopify API calls at request time
-4. React Frontend — App Bridge embedded SPA; Polaris UI; all data from Analytics API; session token on every fetch
+**New and modified components:**
+1. `lib/syncPayouts.js` (MODIFIED) — add `payout_status:PAID` filter; add diagnostic logging for live fee verification before writing any logic changes
+2. `routes/ads-auth.js` (NEW) — Meta + Google OAuth initiation and callbacks; registered outside `/api/` (no JWT — these are top-level window routes, not embedded app routes)
+3. `lib/syncAdSpend.js` (NEW) — daily campaign spend fetch for Meta and Google via platform dispatch on `AdConnection.platform`; idempotent upsert to `AdSpend` table
+4. `lib/scheduler.js` (MODIFIED) — add `syncAdSpend` per-shop per cron tick, wrapped in per-shop try/catch so one shop failure does not abort others
+5. `web/src/components/WaterfallChart.jsx` (NEW) — Recharts `ComposedChart` with server-computed `[low, high]` bar tuples from `GET /api/dashboard/orders/:orderId/waterfall`
+6. `web/src/components/AlertBanner.jsx` (NEW) — dismissable banner; dismiss state in localStorage keyed by alert count + threshold; auto-resolves when margin recovers
+7. `web/src/components/AdsOverview.jsx` (NEW) — connection status cards, Blended ROAS + True ROAS (clearly labeled), campaign spend table, daily spend/revenue trend via Recharts
+8. `prisma/schema.prisma` (MODIFIED) — add `AdConnection` and `AdSpend` models; extend `ShopConfig` with alert threshold columns; extend `OAuthState` with `platform` discriminator
 
-**Key patterns:**
-- Pre-compute profit at write time (sync), read at query time (dashboard)
-- Webhook primary, polling backup (15 min cadence)
-- Shop-scoped everything — `shopDomain` on every model, extracted from JWT not query string
-- Snapshot COGS onto line items at sync time — prevents retroactive COGS changes from rewriting history
-- SyncState per shop — merchants need to know data freshness; essential for trust
-
-**Shopify API strategy:**
-- GraphQL Bulk Operations for initial historical sync (avoids REST cursor expiry and rate limit issues at scale)
-- REST `updated_at_min` filter for incremental sync (simpler, adequate for 50–2,000 orders/month target stores)
-- REST single-order fetch for webhook-triggered updates
+**Key architectural patterns:**
+- Top-level OAuth redirect: `window.top.location.href = redirectUrl` to escape Shopify iframe; callback redirects back to `/admin?shop=...&view=ads`
+- Platform dispatch: `syncAdSpend.js` handles Meta and Google via `platform` field on `AdConnection`; shared `AdSpend` schema avoids duplicating upsert logic
+- Idempotent upsert: `AdSpend @@unique([shop, platform, campaignId, date])` — safe to re-run sync jobs without producing duplicates
+- Graceful degradation: Ads tab shows "connect your account" empty state if no `AdConnection` exists; scheduler is a no-op for unconnected shops
 
 ### Critical Pitfalls
 
-1. **COGS NULL silently treated as $0** — Never use `COALESCE(cogs, 0)` in profit calculations. Track COGS coverage percentage per order; show a dashboard banner when coverage is below 100%. Use a three-state model: known / estimated / unknown.
+1. **Payout REFUND transactions must not overwrite fees** — only process `type === 'CHARGE'` rows from balance transactions. REFUND rows return `fee.amount = "0.00"` and would silently zero out stored fees for matched orders. Treat FEE-FIX-01 as a diagnostic-first task: add logging to inspect raw transaction types and fee amounts from a live Shopify Payments store before writing any changes.
 
-2. **Shopify plan-dependent fee rates hardcoded** — Fetch `shop.plan_name` on install; store in `ShopSession`; use a config table to map plan to transaction fee rate. This affects every profit figure for every merchant not on Basic. Also applies to Shopify Payments processing rates (2.9% Basic vs 2.4% Advanced).
+2. **Meta/Google OAuth popup is blocked inside the Shopify Admin iframe** — `window.open()` fails due to iframe sandbox restrictions; the Shopify Admin shell intercepts popup navigation. Use `window.top.location.href` for all third-party OAuth. Test the complete connect flow inside the actual Shopify Admin iframe (not a standalone browser tab) and explicitly in Safari (stricter ITP than Chrome).
 
-3. **COGS changes retroactively rewriting historical reports** — Snapshot `unitCOGS` onto `LineItem` at sync time. When COGS changes, run an explicit recompute job rather than joining to current COGS at query time.
+3. **Ad tokens must be encrypted at rest** — the existing `ShopSession` stores Shopify tokens plaintext. Reusing that pattern for Meta long-lived user tokens and Google refresh tokens is a security regression. Store all ad tokens with AES-256-GCM via a `lib/encrypt.js` utility. Add `ADS_ENCRYPTION_KEY` to Railway config before any token write code exists. Never revisit this decision — recovery after a plaintext compromise is expensive.
 
-4. **REST pagination cursor expiry corrupting historical sync** — `page_info` tokens expire in ~30 seconds. Use GraphQL Bulk Operations for initial historical syncs. For incremental, persist a `updated_at_min` high-water mark per shop, not a cursor.
+4. **Meta long-lived token expiry silently breaks spend sync** — Meta long-lived tokens expire after approximately 60 days. Store `tokenExpiresAt = NOW() + 55 days` at connection time; check before every sync job; surface a "reconnect required" banner (not `$0` spend) when expired. Do not swallow the 190 `OAuthException` error.
 
-5. **App Bridge JWT not validated on every API request** — Create `requireAppBridgeAuth` middleware validating the JWT on every `/api/*` route. Extract shop from the JWT `dest` claim. Never trust `req.query.shop` for authorization.
+5. **Google developer token approval blocks Phase 5** — Google Ads API requires a developer token that starts at Test Account Access and needs manual Google review for production access. Apply during Phase 4. List "developer token at minimum Test Account Access confirmed" as a hard prerequisite before Phase 5 kickoff.
 
-6. **App review blockers that must be fixed before submission** — Trim the existing 60+ scopes in the toml to only scopes actually used (rejection guaranteed otherwise). Implement real GDPR webhook handlers (`customers/redact`, `customers/data_request`, `shop/redact`) that perform actual data operations — Shopify tests these.
+6. **Recharts waterfall breaks on negative net profit and null COGS** — the standard spacer-bar stacking approach fails when a segment is negative. Compute `[low, high]` tuples server-side in the API endpoint; the React component only renders. Test explicitly with: a loss order (negative net profit), a null-COGS order, and a partial refund order.
 
-7. **CSP missing directives for App Bridge + Polaris** — Extend the existing CSP to include `script-src cdn.shopify.com`, `style-src 'unsafe-inline' cdn.shopify.com`, `img-src cdn.shopify.com`, `connect-src {shop}`. Blank white screen in production is the failure mode.
+7. **Margin alert fatigue destroys the feature** — alerts that fire immediately before COGS is configured or on 1-2 order products cause merchants to disable the feature permanently. Require 7 days of history + 3 minimum orders + `cogsKnown = true` for any alert to fire. Alerts must auto-resolve when margin recovers above threshold.
+
+---
 
 ## Implications for Roadmap
 
-All research converges on a clear 4-phase dependency chain. Each phase has a hard prerequisite on the prior phase. There is no parallelism opportunity between phases.
+Based on combined research, five phases driven by data quality dependencies and architectural coupling.
 
-### Phase 1: Data Foundation
-**Rationale:** Everything in the system — sync service, API routes, and frontend — requires Prisma models to exist. This is the critical path blocker. Also includes OAuth scope cleanup and GDPR handler implementation, which must happen before any App Store submission. The schema design decisions (variant-level COGS, COGS snapshotting on line items, three-state profit model) are irreversible — getting them wrong requires a migration and data recompute.
-**Delivers:** Extended Prisma schema (`Order`, `LineItem`, `Product`, `ProductVariant`, `COGS`, `SyncState`), migrations, scope cleanup, GDPR handlers
-**Addresses:** Table stakes foundation; resolves existing CONCERNS.md gaps
-**Avoids:** Pitfall 7 (product-level COGS), Pitfall 6 (COGS history), Pitfall 8 (NULL COGS), Pitfall 13 (60+ scopes), Pitfall 14 (GDPR stubs)
+### Phase 1: Payout Fee Accuracy Fix
+**Rationale:** Data quality gate for everything downstream. The waterfall chart's Fees bar, margin alert thresholds, and ad attribution all build on fee data. Fixing fees first means no chart or alert built on wrong numbers. This is also the lowest-risk phase — no schema changes, no new packages, targeted modification of one existing file. Run diagnostics first, write code second.
+**Delivers:** Exact per-order Shopify Payments fees stored in `OrderProfit.feesTotal`; verified vs. estimated status per order; payout sync status API endpoint for manual QA
+**Addresses:** FEE-FIX-01; competitive differentiation on accuracy narrative vs. competitors using estimated rates
+**Avoids:** Pitfall 1 (REFUND transaction fee writeback silently zeroing fees); `fee` vs `fees` field path ambiguity (verify against 2025-10 schema before touching write logic)
+**Research flag:** No deeper research needed — Shopify GraphQL schema confirmed HIGH confidence. Run diagnostic logging on live Shopify Payments store as first implementation step, not last.
 
-### Phase 2: Backend Sync Service
-**Rationale:** Once models exist, data must flow into them before API routes can return real data. Building the sync service second means Phase 3 (API routes) can be immediately tested against real synced data rather than stubs. This phase also establishes the profit calculation engine, which is the core business logic of the product.
-**Delivers:** `lib/shopify-api.js` (rate-limited REST wrapper), `lib/profit-calculator.js` (pure function), `lib/sync.js` (orchestration), historical sync on OAuth callback, webhook handlers for `orders/paid`/`orders/updated`/`orders/cancelled`/`orders/refunded`, 15-minute polling job
-**Uses:** GraphQL Bulk Operations for historical sync; REST with `updated_at_min` for incremental
-**Avoids:** Pitfall 1 (cursor expiry), Pitfall 2 (rate limits), Pitfall 3 (plan-dependent fees), Pitfall 4 (Shopify Payments processing tiers), Pitfall 5 (refund fee model), Pitfall 16 (financial status filtering), Pitfall 21 (draft orders)
+### Phase 2: Waterfall Chart
+**Rationale:** No schema changes required — all data already exists in `OrderProfit`. High visual impact, low implementation risk. Delivering the chart before ads integration gives it independent value and establishes it as the visual foundation that the ad spend step will drop into later. Must follow Phase 1 so the Fees bar shows verified data, not estimates.
+**Delivers:** Per-order waterfall chart (click-to-expand from OrdersTable); store-level waterfall on Overview; correct rendering for loss orders, null-COGS orders, and partial refunds
+**Uses:** Existing Recharts 3.8 (already installed); new `GET /api/dashboard/orders/:orderId/waterfall` endpoint returning server-computed `[low, high]` tuples
+**Implements:** `WaterfallChart.jsx`; `OrdersTable.jsx` row click handler
+**Avoids:** Pitfall 6 (Recharts negative segment rendering via server-side tuple computation; frontend renders only); frontend-computed running totals (wrong for null COGS)
+**Research flag:** No deeper research needed — Recharts range Bar pattern is confirmed with a working example. Server-side tuple endpoint is a pure read on existing data.
 
-### Phase 3: Analytics API Routes
-**Rationale:** With real data in the database, API routes can be built and tested with curl/Postman before any React work begins. Separating this phase from the frontend means API contracts are stable before the frontend builds against them. Session token middleware must be implemented here — this is the security boundary.
-**Delivers:** `lib/session-middleware.js` (App Bridge JWT validation), `routes/api.js` (overview, orders, products, COGS CRUD, sync status endpoints)
-**Implements:** Analytics API subsystem
-**Avoids:** Pitfall 9 (App Bridge auth), Anti-Pattern 4 (shop from query string)
+### Phase 3: Margin Alerts
+**Rationale:** Independent of ads integration — can ship in any sequence after Phase 1. Requires a schema migration (extend `ShopConfig`) which can be batched with Phase 4 migration to reduce total migration count, or run standalone for faster delivery. High retention value at low implementation cost. Implement eligibility guards from day one — they are not optional polish.
+**Delivers:** Configurable margin threshold per shop; `GET /api/alerts` + `PUT /api/alerts/config` endpoints; `AlertBanner.jsx` dismissable banner; nav badge count on Products tab; low-margin row highlighting in ProductsTable; threshold settings UI
+**Addresses:** ALERT-01; proactive profit monitoring that surfaces problems without requiring the merchant to go looking
+**Avoids:** Pitfall 7 (alert fatigue — eligibility gate: 7 days history + 3 orders minimum + cogsKnown = true); alerts that never auto-resolve (resolved alert clears when margin recovers)
+**Research flag:** No deeper research needed — alert evaluation reuses the existing products `$queryRaw` pattern. Polaris Banner and Badge patterns are established.
 
-### Phase 4: React Frontend
-**Rationale:** Built last, when all plumbing exists. React becomes a presentation layer over working, tested APIs. Polaris components map directly to the data model (DataTable for orders/products, Card for KPI cards, DatePicker for date range). The frontend build pipeline (Vite + Express static serving) is well-understood.
-**Delivers:** React SPA with overview dashboard, orders table, products table, COGS entry form; CSP header updates; Vite build pipeline in `client/` directory; Docker build step addition
-**Uses:** Vite 5, React 18, Polaris 13, App Bridge 4.x, Recharts, TanStack Query, date-fns
-**Avoids:** Pitfall 10 (CSP directives), Pitfall 17 (cache headers), Pitfall 18 (session token expiry handling)
+### Phase 4: Ads Infrastructure + Meta Ads Integration
+**Rationale:** Largest phase. Establishes the shared `AdConnection` + `AdSpend` schema, the `lib/encrypt.js` token utility, the `routes/ads-auth.js` OAuth flow, and the `lib/syncAdSpend.js` dispatch — all of which Google Ads reuses verbatim. Meta first because Standard Marketing API access tokens are non-expiring (simpler lifecycle than Google's refresh token flow). Apply for Google Ads developer token at Phase 4 kickoff — this is a mandatory parallel action.
+**Delivers:** Meta Ads OAuth connect/disconnect flow using top-level redirect pattern; daily campaign spend sync; `AdsOverview.jsx` tab (connection status, Blended ROAS + True ROAS clearly labeled, campaign spend table, daily spend/revenue trend); ad spend line in P&L KPI cards
+**Uses:** `facebook-nodejs-business-sdk@^24.0.1`; new `routes/ads-auth.js` and `lib/syncAdSpend.js`; `AdConnection` + `AdSpend` Prisma models; AES-256-GCM token encryption via Node built-in `crypto`
+**Avoids:** Pitfall 2 (OAuth popup blocked in iframe — use `window.top.location.href`); Pitfall 3 (plaintext tokens — encrypt at rest from day one); Pitfall 4 (Meta token expiry — `tokenExpiresAt` in schema, reconnect banner on expiry); anti-pattern of client-side token exchange (all OAuth code exchanges server-side only in `routes/ads-auth.js`)
+**Research flag:** Implementation should explicitly reference the existing `routes/auth.js` top-level redirect pattern before writing `routes/ads-auth.js` — the v1.0 code is the reference implementation. **Mandatory parallel action:** submit Google Ads developer token application at Phase 4 kickoff.
 
-### Phase 5: Polish and Differentiators
-**Rationale:** After the core profit loop is working and validated with real merchants, add the features that differentiate from competitors. CSV COGS import becomes necessary once manual entry proves painful for stores with large catalogs. The `costPerItem` auto-import is a quick win that significantly improves onboarding time.
-**Delivers:** CSV COGS import with SKU matching, Shopify `costPerItem` auto-import, COGS coverage banner, fee breakdown UI, margin health alerts
-**Addresses:** "10-minute to value" constraint; differentiator features from FEATURES.md
+### Phase 5: Google Ads Integration
+**Rationale:** Reuses all Phase 4 infrastructure — same `AdConnection`/`AdSpend` schema, same `syncAdSpend.js` dispatch extended with a Google handler, same `AdsOverview.jsx` extended with a Google connection card. No new schema migration. Developer token must be at minimum Test Account Access before Phase 5 begins; all development can proceed against test accounts with no code change needed when production access is approved.
+**Delivers:** Google Ads OAuth connect/disconnect with refresh token flow; daily Google campaign spend sync with token auto-refresh before each call; Google spend line separate from Meta in P&L; campaign table extended with Google campaigns; correct micros-to-dollars conversion (`cost_micros / 1,000,000`)
+**Uses:** `google-ads-api@^23.0.0`; `google-auth-library@^10.6.2`; GAQL campaign spend query; existing `AdsOverview.jsx` + `lib/syncAdSpend.js`
+**Avoids:** Pitfall 5 (developer token delay — applied in Phase 4); Google account timezone normalization to UTC before storing in `AdSpend`; `login-customer-id` header for MCC/Manager accounts (required when merchant's account is under a Google Ads Manager account — omitting causes permission errors)
+**Research flag:** Verify `google-auth-library@10` Node 16.20.2 compatibility before writing any code (`npm install google-auth-library@10 --dry-run`). Verify `google-ads-api@23` gRPC native binary compiles on Railway Docker. Both verifications take minutes and have documented fallbacks — run them at Phase 5 kickoff, not during development.
 
 ### Phase Ordering Rationale
 
-- The schema must exist before sync can write to it; sync must produce data before API routes are useful; API routes must exist before React has anything to call. This is a strict dependency chain with no shortcuts.
-- Profit calculation correctness (fee tiers, NULL COGS, refund handling) belongs in Phase 2 where it can be unit-tested in isolation before the frontend displays the numbers to real merchants.
-- App review blockers (GDPR, scope cleanup) are in Phase 1 so they never become last-minute blockers. They're low-effort and removing them early reduces risk across all remaining phases.
-- Waterfall chart and payout reconciliation are not suggested phases because FEATURES.md explicitly defers them and the architectural complexity (payout-to-order matching) makes them Phase 2+ candidates.
+- **Phase 1 before Phase 2:** Waterfall Fees bar must show verified data. Shipping the chart before the fee fix means the most visible financial visualization displays estimated fees as exact — a merchant trust risk that undermines the accuracy narrative.
+- **Phase 2 before Phase 4:** Establish the waterfall as an independent, functional visualization before adding the ad spend step. The chart has value without ads; ads have their best showcase once the chart exists.
+- **Phase 3 flexible:** Margin alerts are independent of fees, waterfall, and ads. They can precede Phase 4 (as suggested for faster delivery) or be batched with Phase 4 to consolidate the database migration.
+- **Phase 4 before Phase 5:** Meta OAuth establishes all shared infrastructure. Google adds one new platform handler to existing files. Never build Phase 5 in isolation from Phase 4.
+- **Google developer token application during Phase 4:** The external approval timeline is the only item that cannot be controlled with code. Submitting at Phase 4 kickoff maximizes lead time for Phase 5. Development against test accounts proceeds regardless.
 
 ### Research Flags
 
-Phases likely needing deeper research during planning:
-- **Phase 2 (Sync Service):** GraphQL Bulk Operations polling pattern, `transaction.fees` field availability in API version 2025-10, exact Shopify Payments payout GraphQL field names — all require verification against live API. Recommend `/gsd:research-phase` before building this phase.
-- **Phase 4 (React Frontend):** Verify `@shopify/app-bridge-react` package name and version, Polaris current version (v13 or v14), `shopify.idToken()` vs `getSessionToken()` method name in App Bridge 4.x — all changed in recent major versions.
+Phases with standard, well-documented patterns (skip `/gsd:research-phase`):
+- **Phase 1 (Payout Fee Fix):** Shopify GraphQL schema confirmed HIGH confidence. Pattern is a targeted filter change in one existing file. Diagnostic logging step is the implementation, not research.
+- **Phase 2 (Waterfall Chart):** Recharts range Bar pattern is confirmed with a working official example. Server-side tuple endpoint is a pure read from existing `OrderProfit` data.
+- **Phase 3 (Margin Alerts):** Polaris Banner/Badge patterns are established. Alert evaluation reuses the existing products aggregation query with an added threshold filter.
 
-Phases with standard patterns (skip research-phase):
-- **Phase 1 (Data Foundation):** Prisma schema design is standard; patterns are well-established and based on direct code inspection of existing scaffold.
-- **Phase 3 (Analytics API Routes):** JWT middleware validation and Express route structure are well-documented patterns. No Shopify-specific uncertainty.
-- **Phase 5 (Differentiators):** CSV import, UI enhancements — all standard web development patterns.
+Phases requiring careful review at implementation start (not deep research, but verification steps):
+- **Phase 4 (Meta Ads OAuth):** Read the existing `routes/auth.js` top-level redirect implementation before writing `routes/ads-auth.js`. The iframe OAuth constraint is fully understood but the implementation must mirror the proven pattern exactly.
+- **Phase 5 (Google Ads):** Two pre-coding verifications required: `google-auth-library@10` Node 16 compatibility and `google-ads-api@23` gRPC binary compilation on Railway Docker. Both have documented fallbacks. Run at Phase 5 kickoff.
+
+---
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Vite, React 18, Recharts are clear community consensus; Polaris and App Bridge are Shopify-mandated. Specific package versions need `npm show` verification. |
-| Features | HIGH | Competitor feature analysis is consistent across sources; profit calculation arithmetic is deterministic; API field existence is well-documented |
-| Architecture | HIGH | Pre-compute pattern, webhook+polling sync, shop-scoped DB design are standard and confirmed by multiple sources. GraphQL Bulk Operations field names are MEDIUM (verify in 2025-10 schema). |
-| Pitfalls | HIGH | Fee structures, rate limit mechanics, pagination behavior, App Bridge auth, and billing flow are stable, documented Shopify behaviors. Refund fee recouping is MEDIUM (processor-specific). |
+| Stack | MEDIUM | Meta SDK and Recharts waterfall confirmed HIGH. `google-auth-library@10` Node 16 compatibility is MEDIUM — requires live `--dry-run` verification. `google-ads-api` gRPC on Railway Docker is MEDIUM — REST fallback documented. |
+| Features | MEDIUM-HIGH | Shopify GraphQL fields (`ShopifyPaymentsBalanceTransaction.fee`, `CustomerJourneySummary`) confirmed against official docs (HIGH). Competitor feature patterns from App Store listings (MEDIUM). Meta API attribution window changes confirmed against official changelog (MEDIUM-HIGH). |
+| Architecture | HIGH | Existing codebase read directly. OAuth iframe constraint verified against Shopify developer community + official docs. Token lifecycle (Meta long-lived, Google refresh token) verified against official developer docs. Component map and data flows are fully specified. |
+| Pitfalls | HIGH | All eight critical pitfalls verified against official sources, community threads, or direct code inspection. Recovery strategies specified. "Looks Done But Isn't" checklist provided in PITFALLS.md. |
 
 **Overall confidence:** MEDIUM-HIGH
 
-All research is based on training knowledge through August 2025 with no live web lookups available. The architecture and feature decisions are high-confidence because they derive from stable API mechanics and competitor patterns. The specific API field names (GraphQL transaction fees, payout fields) and package versions are MEDIUM confidence — they require live verification before building.
-
 ### Gaps to Address
 
-- **Shopify Payments per-transaction fee field:** `balance/transactions` has a `fee` field but 1:1 mapping to individual orders is unconfirmed. Test against a real Shopify Payments store before building fee sync logic.
-- **`transaction.fees` in GraphQL 2025-10 schema:** The bulk operations query in ARCHITECTURE.md references `transactions { fees { flatFee { amount } rateFee percentageFee } }` — verify this field path exists in the 2025-10 GraphQL schema before building.
-- **Third-party gateway rates:** Shopify API does not expose the actual gateway fee charged by PayPal, Stripe, etc. The recommended MVP escape hatch is a "gateway rate settings" page where merchants input their own rates. Do not rely on a hardcoded rate table for third-party gateways.
-- **App Bridge package name in 2026:** `@shopify/app-bridge-react` — may have been renamed or consolidated since August 2025 training cutoff. Run `npm show @shopify/app-bridge-react` before beginning Phase 4.
-- **Shopify plan name values:** The `plan_name` field from `GET /admin/api/shop.json` — exact string values (e.g., `"basic"`, `"shopify"`, `"advanced"`) should be verified against a live API response before building the fee rate config table.
-- **Existing scope list cleanup:** The toml file currently has 60+ scopes. The exact list of minimum required scopes for Phase 1 MVP needs to be verified against the actual API endpoints used. PITFALLS.md lists the expected required scopes but the full audit should happen in Phase 1.
+- **`google-auth-library@10` Node 16 compatibility:** Run `npm install google-auth-library@10 --dry-run` on the actual Node 16.20.2 runtime before Phase 5 begins. Fallback: `^9.15.1`. Five-minute check, not a research gap.
+- **`payout_status:PAID` filter syntax on `balanceTransactions`:** MEDIUM confidence — confirmed in Shopify community thread but not in official docs. The Phase 1 diagnostic logging approach resolves this empirically before any write logic is added.
+- **Meta long-lived token non-expiring claim:** MEDIUM confidence from official Meta docs. Store `tokenExpiresAt = NOW() + 55 days` as a conservative defense regardless — if tokens are genuinely non-expiring for Standard Access, the expiry check path never fires but causes no harm.
+- **Google Ads developer token approval timeline:** Uncontrollable external dependency. Mitigation is applying early (during Phase 4) and developing Phase 5 entirely against Test Account Access. No code change needed when production access is approved.
+- **GDPR `shop/redact` handler must cover ad data:** The existing GDPR webhook handler must be extended in Phase 4 to delete `AdConnection` and `AdSpend` rows for the shop on `shop/redact`. Add to Phase 4 acceptance criteria — Shopify tests this during App Review.
+
+---
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Existing project files: `shopify.app.profit-tracker.toml`, `server.js`, `.planning/codebase/ARCHITECTURE.md`, `.planning/codebase/INTEGRATIONS.md`, `.planning/codebase/CONCERNS.md` — direct code inspection
-- Shopify Admin REST API documentation (training data through Aug 2025) — order/product/transaction object structure, rate limits, pagination mechanics
-- App Bridge 4.x documentation (training data) — session token flow, JWT validation pattern
-- Shopify Billing API documentation (training data) — charge status flow, test mode behavior
-- Shopify App Review guidelines (training data) — scope minimization, GDPR webhook requirements
+- [ShopifyPaymentsBalanceTransaction — Shopify GraphQL Admin API](https://shopify.dev/docs/api/admin-graphql/latest/objects/ShopifyPaymentsBalanceTransaction) — `fee` field, `associatedOrder`, transaction type filtering
+- [New fees and net fields for balance transactions — Shopify Changelog 2025-04](https://shopify.dev/changelog/new-fees-and-net-fields-for-balance-transactions) — adjustment order edge case coverage
+- [CustomerJourneySummary — Shopify GraphQL Admin API](https://shopify.dev/docs/api/admin-graphql/latest/objects/customerjourneysummary) — UTM attribution fields
+- [Recharts Waterfall Example](https://recharts.github.io/en-US/examples/Waterfall/) — range Bar pattern confirmed working
+- [facebook-nodejs-business-sdk GitHub](https://github.com/facebook/facebook-nodejs-business-sdk) — v24.0.1, CommonJS, no declared Node minimum
+- [google-ads-api npm (Opteo)](https://www.npmjs.com/package/google-ads-api) — v23.0.0, Node 16 confirmed by maintainer
+- [Google Ads API v20 announcement — Google Developer Blog, June 2025](https://ads-developers.googleblog.com/2025/06/announcing-v20-of-google-ads-api.html) — current API version, v19 sunset date
+- [Google Ads API developer token update — Google Ads Developer Blog, Feb 2026](https://ads-developers.googleblog.com/2026/02/an-update-on-google-ads-api-developer.html) — approval delay acknowledgment
+- [OAuth popup reclaim in Shopify Admin shell — Shopify Dev Community](https://community.shopify.dev/t/shopify-oauth-popup-cannot-auto-close-after-successful-install-when-initiated-from-admin-shopify-com-admin-shell-reclaiming-window/28862) — iframe OAuth constraint confirmed by Shopify engineering
 
 ### Secondary (MEDIUM confidence)
-- Competitor product analysis: Triple Whale, BeProfit, Lifetimely, Peel Insights — feature sets as of August 2025 training cutoff (products change; verify current state)
-- Shopify fee structure — plan pricing and gateway rates accurate as of training data; verify against live pricing page before shipping fee calculator
-- GraphQL Bulk Operations field names — verify `transaction.fees` path against 2025-10 schema
-- r/shopify merchant community patterns — feature expectations and pain points
-
-### Tertiary (LOW confidence)
-- `inventory_item.cost` population rate among target merchants — assumed low based on community knowledge; instrument to confirm
-- Shopify `plan_name` API field exact string values — needs live verification
+- [Meta Ads Attribution Window changes June 2025 — Windsor.ai](https://windsor.ai/documentation/facebook-ads-meta-api-updates-june-10-2025/) — unified attribution enforcement
+- [Meta Ads Attribution Window Removed January 2026 — Dataslayer](https://www.dataslayer.ai/blog/meta-ads-attribution-window-removed-january-2026) — view-through window deprecation timeline
+- [Balance Transactions filter by payout — Shopify Dev Community](https://community.shopify.dev/t/balance-transactions-by-payout-id/20934) — `payout_status:PAID` filter syntax (not in official docs)
+- [Triple Whale Net Profit formula](https://triplewhale.readme.io/docs/net-profit) — competitor feature reference
+- [GoProfit Smart Alerts — Shopify App Store](https://apps.shopify.com/go-profit) — competitor alert UX pattern
+- [Margin Insight — Shopify App Store](https://apps.shopify.com/margininsight) — competitor alert UX pattern
+- [Shopimize — Shopify App Store](https://apps.shopify.com/shopimize) — competitor negative margin alert pattern
+- [Attribution mismatch Meta vs Shopify 2026](https://attribuly.com/blogs/shopify-attribution-mismatches-meta-vs-tiktok-2026/) — 20–30% Meta over-attribution estimate
+- [Recharts negative values bar chart issue #1427](https://github.com/recharts/recharts/issues/1427) — negative segment rendering failure mode documented
 
 ---
-*Research completed: 2026-03-10*
+*Research completed: 2026-03-18*
 *Ready for roadmap: yes*

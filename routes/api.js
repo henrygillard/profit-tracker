@@ -198,6 +198,7 @@ router.get('/dashboard/overview', async (req, res) => {
   return res.json({
     revenueNet: Number(agg._sum.revenueNet ?? 0),
     feesTotal: Number(agg._sum.feesTotal ?? 0),
+    shippingCost: Number(agg._sum.shippingCost ?? 0),
     cogsTotal: Number(knownAgg._sum.cogsTotal ?? 0),
     netProfit: Number(knownAgg._sum.netProfit ?? 0),
     orderCount: agg._count._all,
@@ -240,6 +241,7 @@ router.get('/dashboard/orders', async (req, res) => {
     revenueNet: Number(op.revenueNet),
     cogsTotal: op.cogsTotal !== null ? Number(op.cogsTotal) : null,
     feesTotal: Number(op.feesTotal),
+    shippingCost: Number(op.shippingCost),
     netProfit: op.netProfit !== null ? Number(op.netProfit) : null,
     marginPct: op.revenueNet && op.netProfit !== null
       ? (Number(op.netProfit) / Number(op.revenueNet)) * 100

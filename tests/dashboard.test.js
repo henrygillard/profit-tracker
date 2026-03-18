@@ -97,6 +97,7 @@ describe('DASH-02: GET /api/dashboard/orders', () => {
         netProfit: 65.0,
         marginPct: 65.0,
         cogsKnown: true,
+        feeSource: 'estimated',
       },
     ]);
 
@@ -110,6 +111,7 @@ describe('DASH-02: GET /api/dashboard/orders', () => {
       revenueNet: expect.any(Number),
       cogsTotal: expect.any(Number),
       feesTotal: expect.any(Number),
+      feeSource: expect.stringMatching(/^(verified|estimated|pending)$/),
       netProfit: expect.any(Number),
       marginPct: expect.any(Number),
       cogsKnown: expect.any(Boolean),

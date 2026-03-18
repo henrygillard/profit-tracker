@@ -56,7 +56,12 @@ Plans:
   2. Clicking any order row opens a per-order waterfall chart showing that order's full cost decomposition
   3. When COGS data is missing for some items, the chart displays a warning annotation rather than rendering a misleadingly complete breakdown
   4. Loss orders (negative net profit) render correctly — the Net Profit bar is red and extends below the zero baseline without visual glitches
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — TDD Wave 0: failing test scaffolds (chart.test.js + dashboard.test.js shippingCost assertions)
+- [ ] 06-02-PLAN.md — API shippingCost extension + WaterfallChart component + modal CSS
+- [ ] 06-03-PLAN.md — Integration: wire WaterfallChart into Overview + WaterfallModal into OrdersTable + human checkpoint
 
 ### Phase 7: Margin Alerts
 **Goal**: Merchants are proactively notified when any SKU's margin falls below their configured threshold — without needing to go looking for the problem
@@ -108,8 +113,8 @@ Plans:
 | 2. Sync and Profit Engine | v1.0 | 7/7 | Complete | 2026-03-14 |
 | 3. Profit Dashboard | v1.0 | 5/5 | Complete | 2026-03-14 |
 | 4. Billing | v1.0 | 3/3 | Complete | 2026-03-14 |
-| 5. Payout Fee Accuracy | 3/3 | Complete   | 2026-03-18 | - |
-| 6. Waterfall Chart | v2.0 | 0/TBD | Not started | - |
+| 5. Payout Fee Accuracy | v2.0 | 3/3 | Complete | 2026-03-18 |
+| 6. Waterfall Chart | v2.0 | 0/3 | Not started | - |
 | 7. Margin Alerts | v2.0 | 0/TBD | Not started | - |
 | 8. Meta Ads + Ads Infrastructure | v2.0 | 0/TBD | Not started | - |
 | 9. Google Ads Integration | v2.0 | 0/TBD | Not started | - |

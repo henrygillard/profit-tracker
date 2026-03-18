@@ -2,8 +2,8 @@
 phase: 5
 slug: payout-fee-accuracy
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-18
 ---
 
@@ -38,14 +38,13 @@ created: 2026-03-18
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 5-01-01 | 01 | 0 | FEEX-01 | unit | `npm test -- --testPathPattern=feeSource` | ❌ W0 | ⬜ pending |
+| 5-01-01 | 01 | 1 | FEEX-01 | unit | `npm test -- --testPathPattern=feeSource` | ❌ W0 | ⬜ pending |
 | 5-01-02 | 01 | 1 | FEEX-01 | unit | `npm test -- --testPathPattern=feeSource` | ✅ | ⬜ pending |
-| 5-02-01 | 02 | 1 | FEEX-01 | unit | `npm test -- --testPathPattern=syncPayouts` | ✅ | ⬜ pending |
-| 5-02-02 | 02 | 1 | FEEX-03 | unit | `npm test -- --testPathPattern=syncPayouts` | ✅ | ⬜ pending |
-| 5-03-01 | 03 | 1 | FEEX-02 | unit | `npm test -- --testPathPattern=feeStatus` | ❌ W0 | ⬜ pending |
-| 5-03-02 | 03 | 1 | FEEX-02 | manual | N/A | N/A | ⬜ pending |
-| 5-04-01 | 04 | 2 | FEEX-04 | unit | `npm test -- --testPathPattern=refund` | ✅ | ⬜ pending |
-| 5-04-02 | 04 | 2 | FEEX-04 | unit | `npm test -- --testPathPattern=refund` | ✅ | ⬜ pending |
+| 5-02-01 | 02 | 2 | FEEX-01 | unit | `npm test -- --testPathPattern=fees` | ✅ | ⬜ pending |
+| 5-02-02 | 02 | 2 | FEEX-03 | unit | `npm test -- --testPathPattern=fees` | ✅ | ⬜ pending |
+| 5-02-03 | 02 | 2 | FEEX-04 | unit | `npm test -- --testPathPattern="fees\|webhooks"` | ✅ | ⬜ pending |
+| 5-03-01 | 03 | 3 | FEEX-02 | unit | `npm test -- --testPathPattern=dashboard` | ❌ W0 | ⬜ pending |
+| 5-03-02 | 03 | 3 | FEEX-02 | manual | N/A | N/A | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -53,8 +52,9 @@ created: 2026-03-18
 
 ## Wave 0 Requirements
 
-- [ ] `__tests__/feeSource.test.js` — stubs for FEEX-01 (feeSource derivation logic)
-- [ ] `__tests__/feeStatus.test.js` — stubs for FEEX-02 (fee status badge rendering)
+- [x] `tests/fees.test.js` — stub tests for FEEX-01/FEEX-03/FEEX-04 (added in Plan 01, Task 1)
+- [x] `tests/webhooks.test.js` — stub tests for FEEX-04 refund passthrough (added in Plan 01, Task 2)
+- [ ] `tests/dashboard.test.js` — stubs for FEEX-02 (fee status badge rendering, added in Plan 01 if required; else Plan 03 Task 1 is the W0 step)
 
 *Existing test infrastructure (jest) covers all other phase requirements.*
 
@@ -71,11 +71,11 @@ created: 2026-03-18
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s
+- [x] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** pending

@@ -100,6 +100,7 @@ model OrderProfit {
   shippingCost  Decimal  @map("shipping_cost") @db.Decimal(12, 2)
   netProfit     Decimal? @map("net_profit")   @db.Decimal(12, 2) // NULL when cogsTotal is NULL
   cogsKnown     Boolean  @default(false) @map("cogs_known")
+  feeSource     String   @default("estimated") @map("fee_source")  // 'verified' | 'estimated' | 'pending'
   calculatedAt  DateTime @default(now()) @map("calculated_at")
 
   order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)

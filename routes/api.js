@@ -245,6 +245,7 @@ router.get('/dashboard/orders', async (req, res) => {
       ? (Number(op.netProfit) / Number(op.revenueNet)) * 100
       : null,
     cogsKnown: op.cogsKnown,
+    feeSource: op.feeSource || 'estimated',  // FEEX-02: pass through feeSource for UI badge
   })));
 });
 

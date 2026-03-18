@@ -83,7 +83,7 @@ Deferred to v2.1+ after v2.0 validation.
 
 ## Traceability
 
-Which phases cover which requirements. Updated during roadmap creation.
+Which phases cover which requirements. Confirmed during roadmap creation 2026-03-18.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
@@ -115,4 +115,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-18*
-*Last updated: 2026-03-18 after initial v2.0 definition*
+*Last updated: 2026-03-18 — traceability confirmed during roadmap creation*

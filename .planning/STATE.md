@@ -2,40 +2,40 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Competitive Parity
-status: planning
+status: ready_to_plan
 stopped_at: ~
 last_updated: "2026-03-18T00:00:00.000Z"
-last_activity: 2026-03-18 — Milestone v2.0 started
+last_activity: 2026-03-18 — v2.0 roadmap created (Phases 5-9)
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 19
-  completed_plans: 19
-  percent: 100
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-14 after v1.0 milestone)
+See: .planning/PROJECT.md (updated 2026-03-18 — started v2.0 milestone)
 
 **Core value:** Merchants see what they actually kept — not just what came in — within 10 minutes of installing.
-**Current focus:** Planning next milestone (v1.1)
+**Current focus:** Phase 5 — Payout Fee Accuracy
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-18 — Milestone v2.0 started
+Phase: 5 of 9 (Payout Fee Accuracy)
+Plan: — (not yet planned)
+Status: Ready to plan
+Last activity: 2026-03-18 — v2.0 roadmap created (Phases 5-9)
 
 Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
+- Total plans completed: 0 (v2.0)
 - Average duration: —
 - Total execution time: —
 
@@ -50,25 +50,6 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: —
 
 *Updated after each plan completion*
-| Phase 01-data-foundation P01 | 7 | 2 tasks | 7 files |
-| Phase 01-data-foundation P02 | 5min | 1 tasks | 1 files |
-| Phase 01-data-foundation P04 | 138 | 1 tasks | 2 files |
-| Phase 01-data-foundation P03 | 5 | 2 tasks | 4 files |
-| Phase 02-sync-and-profit-engine P01 | 202 | 2 tasks | 8 files |
-| Phase 02-sync-and-profit-engine P03 | 7 | 2 tasks | 6 files |
-| Phase 02-sync-and-profit-engine P02 | 10 | 2 tasks | 6 files |
-| Phase 02-sync-and-profit-engine P05 | 5 | 2 tasks | 2 files |
-| Phase 02-sync-and-profit-engine P06 | 5 | 2 tasks | 3 files |
-| Phase 02-sync-and-profit-engine P04 | 15 | 3 tasks | 3 files |
-| Phase 02-sync-and-profit-engine P07 | 3 | 3 tasks | 2 files |
-| Phase 03-profit-dashboard P01 | 8 | 2 tasks | 2 files |
-| Phase 03-profit-dashboard P02 | 4 | 2 tasks | 1 files |
-| Phase 03-profit-dashboard P03 | 3 | 2 tasks | 7 files |
-| Phase 03-profit-dashboard P04 | 3 | 2 tasks | 6 files |
-| Phase 03-profit-dashboard P05 | 5 | 2 tasks | 1 files |
-| Phase 04-billing P01 | 9 | 2 tasks | 3 files |
-| Phase 04-billing P02 | 442 | 2 tasks | 5 files |
-| Phase 04-billing P03 | 15 | 1 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -77,51 +58,9 @@ Progress: [░░░░░░░░░░] 0%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- [Roadmap]: Coarse granularity yielded 4 phases — Foundation → Sync/Profit Engine → Dashboard → Billing
-- [Roadmap]: COGS and FEES requirements merged into Phase 2 (not separate phase) because profit is computed at write time; separating them would break the architecture
-- [Roadmap]: GDPR handlers (FOUND-01) and scope cleanup (FOUND-02) are Phase 1 — they block App Store submission and must be resolved before any other work ships
-- [Phase 01-data-foundation]: Pinned jest@29 (not 30) for Node 16.20.2 compatibility — jest@30 requires os.availableParallelism from Node 18
-- [Phase 01-data-foundation]: env.test.js uses os.tmpdir() as spawnSync cwd to prevent dotenv from loading project .env and restoring deleted env vars
-- [Phase 01-data-foundation]: auth.test.js uses try/catch + moduleLoaded flag for clean loading before lib/verifySessionToken.js is created
-- [Phase 01-data-foundation]: customers/redact and customers/data_request are log-only in Phase 1 (no PII stored) — Phase 2+ annotated for real deletion/export
-- [Phase 01-data-foundation]: shop/redact uses identical deleteMany pattern as app_uninstalled handler for consistent full shop data removal
-- [Phase 01-data-foundation]: Phase 1 scopes set to empty string — App Review requires justification for every scope, no Admin API calls in Phase 1
-- [Phase 01-data-foundation]: Phase 2 scopes documented as inline comments in toml; read_all_orders requires pre-approval before Phase 2 starts
-- [Phase 01-data-foundation]: Export verifySessionToken as dual module.exports/named export for test + destructured usage compatibility
-- [Phase 01-data-foundation]: req.shopDomain set from payload.dest hostname — never from req.query.shop (Shopify App Review requirement)
-- [Phase 02-sync-and-profit-engine]: node-cron/multer/csv-parser installed as production dependencies — required at runtime for scheduling, file upload, and CSV parsing
-- [Phase 02-sync-and-profit-engine]: shopifyClient mock registered via moduleNameMapper with both ../ and ./ path variants — consistent with existing prisma mock pattern
-- [Phase 02-sync-and-profit-engine]: COGS time-series via insert-only ProductCost rows (NEVER update) — cogsTotal NULL signals unknown COGS, propagates to netProfit=NULL
-- [Phase 02-sync-and-profit-engine]: profitEngine mock uses jest.mock() with virtual:true inline in sync.test.js — profit.test.js/fees.test.js/cogs.test.js import real lib/profitEngine once Plan 02-02 creates it
-- [Phase 02-sync-and-profit-engine]: Added './shopifyClient' (sibling-require pattern) to jest.config.js moduleNameMapper for lib/ modules requiring siblings
-- [Phase 02-sync-and-profit-engine]: Removed profitEngine from jest.config.js moduleNameMapper — sync.test.js uses jest.mock() inline; global mapping blocked profit.test.js from reaching real module
-- [Phase 02-sync-and-profit-engine]: revenueNet = currentTotalPrice - totalRefunded (explicit subtraction); proportional COGS denominator is itemsTotal (lineItems sum), not currentTotalPrice
-- [Phase 02-sync-and-profit-engine]: CSV imports store variantId=sku as placeholder — SKU-only entries valid per COGS-03, variantId can be null
-- [Phase 02-sync-and-profit-engine]: Sub-millisecond effectiveFrom offset (now + imported count) prevents unique constraint collision on same-second CSV batch
-- [Phase 02-sync-and-profit-engine]: syncPayouts filters CHARGE type only — REFUND transactions excluded; totalRefunded already handles revenue adjustment
-- [Phase 02-sync-and-profit-engine]: Sum multiple CHARGE transactions per order before updating — partial capture creates multiple CHARGE nodes for same associatedOrder.id
-- [Phase 02-sync-and-profit-engine]: syncPayouts is idempotent — repeated calls overwrite feesTotal with same computed value, safe to call after OAuth
-- [Phase 02-sync-and-profit-engine]: Webhook registration is fire-and-forget in OAuth callback — merchant redirect must not be blocked; errors logged non-fatal
-- [Phase 02-sync-and-profit-engine]: In-memory processedWebhooks Set with 30-min TTL — covers Shopify 15-min retry window without DB overhead at MVP scale
-- [Phase 02-sync-and-profit-engine]: bulk/finish skips deduplication — JSONL URL expires, bulk ops fire once, dedup would break retry on legitimate failure
-- [Phase 03-profit-dashboard]: Dashboard tests use mocked JWT middleware (always-authenticated pattern) — Nyquist compliance via 9 TDD RED stubs all failing with 404 before routes exist
-- [Phase 03-profit-dashboard]: prisma.$queryRaw goes at top level of mock object (not nested), matching real PrismaClient API surface
-- [Phase 03-profit-dashboard]: Dual-aggregate pattern for overview: separate aggregates for all-orders (revenue/fees) and cogsKnown=true orders (COGS/netProfit) prevents NULL poisoning
-- [Phase 03-profit-dashboard]: Dual key casing in $queryRaw mapping (snake_case ?? camelCase) supports real Postgres column names and Jest mock camelCase keys without test changes
-- [Phase 03-profit-dashboard]: Used create-vite@4 (not v9) for Node 16.20.2 compatibility — v9 requires Node 20+
-- [Phase 03-profit-dashboard]: Removed StrictMode from main.jsx — App Bridge embedded context incompatible with double-invoke behavior
-- [Phase 03-profit-dashboard]: App Bridge CDN first script in head (hard requirement for window.shopify global), Polaris CDN second, no @shopify npm packages
-- [Phase 03-profit-dashboard]: OrdersTable resets page and allOrders to [] on dateRange or sort change to prevent stale pages from contaminating new results
-- [Phase 03-profit-dashboard]: useEffect deps use primitive dateRange.from/dateRange.to fields (not object reference) to avoid spurious re-fetches
-- [Phase 03-profit-dashboard]: res.sendFile replaces inline HTML placeholder in /admin route — session check and redirect preserved, no wildcard catch-all to avoid intercepting API routes
-- [Phase 04-billing]: Wave 0 TDD approach: import routes/billing.js at test file top level — MODULE_NOT_FOUND causes test suite to fail RED cleanly
-- [Phase 04-billing]: Migration SQL created manually (non-interactive env blocks prisma migrate dev) — npx prisma generate regenerates client from schema
-- [Phase 04-billing]: billingStatus and subscriptionId added as nullable String? to ShopSession — values ACTIVE | INACTIVE | null
-- [Phase 04-billing]: billingWebhookRouter exported from routes/billing.js for test contract compatibility — webhooks.js imports checkBillingStatus and duplicates handler inline for production routing
-- [Phase 04-billing]: routes/billing mock uses jest.requireActual for billingWebhookRouter — preserves real HMAC logic in tests while making createBillingSubscription/checkBillingStatus jest.fn() mockable
-- [Phase 04-billing]: OAuth callback redirects to billing confirmationUrl on success; falls through to /admin on error — never blocks merchant on billing failure
-- [Phase 04-billing]: /admin uses Pattern 5 live verification (checkBillingStatus before createBillingSubscription) to handle race conditions post-approval
-- [Phase 04-billing]: verifySessionToken made async with prisma billing guard returning 402 for inactive subscriptions; ./prisma sibling path added to jest.config.js moduleNameMapper
+- [Roadmap v2.0]: Phase 5 is a data quality gate — all downstream features (waterfall Fees bar, margin calculations, ad attribution) depend on correct per-order fee data
+- [Roadmap v2.0]: CHART-05 (ad spend waterfall step) belongs in Phase 8 with Meta Ads — it is the payoff visualization, not a standalone chart feature
+- [Roadmap v2.0]: Phase 9 has an external dependency (Google developer token approval) that cannot be controlled with code — apply during Phase 8 kickoff
 
 ### Pending Todos
 
@@ -129,13 +68,14 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 2]: GraphQL Bulk Operations `transaction.fees` field path needs live verification against 2025-10 schema before building fee sync logic
-- [Phase 2]: Shopify Payments payout-to-order 1:1 mapping is unconfirmed — test against real Shopify Payments store before building
-- [Phase 3]: `@shopify/app-bridge-react` package name may have changed since training cutoff — run `npm show` before starting
-- [Phase 3]: Verify Polaris current version (v13 or v14) and `shopify.idToken()` method name before building
+- [Phase 5]: `payout_status:PAID` filter syntax on `balanceTransactions` is MEDIUM confidence — confirmed in community thread but not official docs. Run diagnostic logging on live Shopify Payments store as first implementation step before writing any write logic.
+- [Phase 5]: `fee` vs `fees` field path on `ShopifyPaymentsBalanceTransaction` needs live verification against 2025-10 GraphQL schema before touching sync write logic.
+- [Phase 8]: `ADS_ENCRYPTION_KEY` must be added to Railway config before any ad token write code exists — never store Meta or Google tokens plaintext.
+- [Phase 8]: GDPR `shop/redact` webhook handler must be extended to delete `AdConnection` and `AdSpend` rows — Shopify tests this during App Review.
+- [Phase 9]: Google Ads developer token requires external approval. Apply at Phase 8 kickoff. Phase 9 development can proceed against Test Account Access with no code change needed when production access is approved.
 
 ## Session Continuity
 
-Last session: 2026-03-14T20:25:20.752Z
-Stopped at: Completed 04-billing 04-03-PLAN.md
+Last session: 2026-03-18
+Stopped at: Roadmap created for v2.0 milestone
 Resume file: None

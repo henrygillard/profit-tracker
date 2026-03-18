@@ -10,6 +10,18 @@ The app is a full-stack Node.js/Express + PostgreSQL + React application embedde
 
 Merchants see what they actually kept — not just what came in — within 10 minutes of installing.
 
+## Current Milestone: v2.0 Competitive Parity
+
+**Goal:** Close the three retention risks identified post-v1.0 — verify and fix fee accuracy, add high-value UX differentiators (waterfall chart + margin alerts), and ship Meta + Google Ads integration to compete with Triple Whale and BeProfit.
+
+**Target features:**
+- Payout fee verification and fix (latent risk: unconfirmed payout-to-order mapping)
+- Per-order profit waterfall chart (visual "aha moment" — where did my revenue go?)
+- Margin alerts (proactive low-margin SKU surfacing — push insight, don't wait for merchants to find it)
+- Meta Ads account connection + spend attribution per order
+- Google Ads account connection + spend attribution per order
+- True profit per campaign after COGS, fees, and ad spend
+
 ## Requirements
 
 ### Validated
@@ -35,12 +47,12 @@ Merchants see what they actually kept — not just what came in — within 10 mi
 
 ### Active
 
-- [ ] Meta Ads account connection + spend attribution per order (ADS-01)
-- [ ] Google Ads account connection + spend attribution per order (ADS-02)
-- [ ] True profit per campaign after COGS and fees (ADS-03)
-- [ ] Customer cohort LTV builder — 30/60/90/180/365 day curves (ADV-01, ADV-02)
-- [ ] Margin trend per SKU over time with deterioration alerts (ADV-03)
-- [ ] Two-tier pricing (Basic / Pro) — evaluate after single-plan validation (BILL-02)
+- [ ] Payout fee accuracy: verify and fix payout-to-order 1:1 mapping for Shopify Payments stores (FEE-FIX-01) — v2.0
+- [ ] Per-order profit waterfall chart showing revenue decomposition (CHART-01) — v2.0
+- [ ] Margin alert system: flag products/SKUs below configurable threshold (ALERT-01) — v2.0
+- [ ] Meta Ads account connection + spend attribution per order (ADS-01) — v2.0
+- [ ] Google Ads account connection + spend attribution per order (ADS-02) — v2.0
+- [ ] True profit per campaign after COGS, fees, and ad spend (ADS-03) — v2.0
 
 ### Out of Scope
 
@@ -91,4 +103,4 @@ Merchants see what they actually kept — not just what came in — within 10 mi
 | Vite 4 for SPA scaffold | Node 16.20.2 compatibility — Vite 9 requires Node 20+ | ✓ Good |
 
 ---
-*Last updated: 2026-03-14 after v1.0 milestone*
+*Last updated: 2026-03-18 — started v2.0 milestone*

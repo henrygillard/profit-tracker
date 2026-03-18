@@ -1,11 +1,11 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: MVP
-status: shipped
-stopped_at: v1.0 milestone archived 2026-03-14
-last_updated: "2026-03-14T22:05:07.177Z"
-last_activity: 2026-03-14 — v1.0 MVP milestone shipped and archived
+milestone: v2.0
+milestone_name: Competitive Parity
+status: planning
+stopped_at: ~
+last_updated: "2026-03-18T00:00:00.000Z"
+last_activity: 2026-03-18 — Milestone v2.0 started
 progress:
   total_phases: 4
   completed_phases: 4
@@ -25,9 +25,12 @@ See: .planning/PROJECT.md (updated 2026-03-14 after v1.0 milestone)
 
 ## Current Position
 
-Milestone v1.0 shipped. All 4 phases complete (19 plans). Ready for next milestone.
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-18 — Milestone v2.0 started
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 

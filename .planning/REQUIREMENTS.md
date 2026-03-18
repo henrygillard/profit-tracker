@@ -9,10 +9,10 @@ Requirements for the Competitive Parity milestone. Each maps to roadmap phases.
 
 ### Fee Accuracy
 
-- [ ] **FEEX-01**: Merchant's Shopify Payments orders store the exact processing fee from `ShopifyPaymentsBalanceTransaction.fee` — not an estimated rate calculated from a rate table
-- [ ] **FEEX-02**: Each order displays a "Verified" indicator when its fee came from a confirmed payout transaction, or "Estimated" when the rate-table fallback was used — never silently mixing the two
-- [ ] **FEEX-03**: Orders not yet settled into a payout show a "Pending" fee state instead of displaying an estimated fee as if it were exact
-- [ ] **FEEX-04**: When an order is refunded, the fee reversal uses the exact settled fee amount rather than an estimated reversal — existing refund logic is extended, not replaced
+- [x] **FEEX-01**: Merchant's Shopify Payments orders store the exact processing fee from `ShopifyPaymentsBalanceTransaction.fee` — not an estimated rate calculated from a rate table
+- [x] **FEEX-02**: Each order displays a "Verified" indicator when its fee came from a confirmed payout transaction, or "Estimated" when the rate-table fallback was used — never silently mixing the two
+- [x] **FEEX-03**: Orders not yet settled into a payout show a "Pending" fee state instead of displaying an estimated fee as if it were exact
+- [x] **FEEX-04**: When an order is refunded, the fee reversal uses the exact settled fee amount rather than an estimated reversal — existing refund logic is extended, not replaced
 
 ### Waterfall Chart
 
@@ -87,10 +87,10 @@ Which phases cover which requirements. Confirmed during roadmap creation 2026-03
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FEEX-01 | Phase 5 | Pending |
-| FEEX-02 | Phase 5 | Pending |
-| FEEX-03 | Phase 5 | Pending |
-| FEEX-04 | Phase 5 | Pending |
+| FEEX-01 | Phase 5 | Complete |
+| FEEX-02 | Phase 5 | Complete |
+| FEEX-03 | Phase 5 | Complete |
+| FEEX-04 | Phase 5 | Complete |
 | CHART-01 | Phase 6 | Pending |
 | CHART-02 | Phase 6 | Pending |
 | CHART-03 | Phase 6 | Pending |

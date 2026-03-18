@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Competitive Parity
-status: ready_to_plan
-stopped_at: ~
-last_updated: "2026-03-18T00:00:00.000Z"
+status: planning
+stopped_at: Completed 05-payout-fee-accuracy-01-PLAN.md
+last_updated: "2026-03-18T20:34:15.400Z"
 last_activity: 2026-03-18 — v2.0 roadmap created (Phases 5-9)
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 3
+  completed_plans: 1
   percent: 0
 ---
 
@@ -50,6 +50,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: —
 
 *Updated after each plan completion*
+| Phase 05-payout-fee-accuracy P01 | 15min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -61,6 +62,8 @@ Recent decisions affecting current work:
 - [Roadmap v2.0]: Phase 5 is a data quality gate — all downstream features (waterfall Fees bar, margin calculations, ad attribution) depend on correct per-order fee data
 - [Roadmap v2.0]: CHART-05 (ad spend waterfall step) belongs in Phase 8 with Meta Ads — it is the payoff visualization, not a standalone chart feature
 - [Roadmap v2.0]: Phase 9 has an external dependency (Google developer token approval) that cannot be controlled with code — apply during Phase 8 kickoff
+- [Phase 05-payout-fee-accuracy]: feeSource defaults to 'estimated' so all pre-Phase-5 rows are safe without data loss
+- [Phase 05-payout-fee-accuracy]: Extended tests/__mocks__/prisma.js with order, lineItem, shopConfig, orderProfit.upsert to support full upsertOrder test execution
 
 ### Pending Todos
 
@@ -76,6 +79,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18
-Stopped at: Roadmap created for v2.0 milestone
+Last session: 2026-03-18T20:34:15.397Z
+Stopped at: Completed 05-payout-fee-accuracy-01-PLAN.md
 Resume file: None

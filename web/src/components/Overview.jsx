@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { apiFetch } from "../api.js";
 import CogsCoverage from "./CogsCoverage.jsx";
+import WaterfallChart from "./WaterfallChart.jsx";
 
 function InfoTooltip({ lines }) {
   const [pos, setPos] = useState(null);
@@ -228,39 +229,52 @@ export default function Overview({ dateRange, onDateChange }) {
       {error && <div className="pt-error-msg">{error}</div>}
 
       {!loading && !error && data && (
-        <div className="pt-kpi-grid">
-          {KPI_META.map((meta) => {
-            const value = meta.getValue(data);
-            const sub = meta.getSub(data);
-            const color = meta.isDynamic
-              ? value >= 0
-                ? "var(--c-profit)"
-                : "var(--danger)"
-              : meta.color;
-            const bg = meta.isDynamic
-              ? value >= 0
-                ? "var(--c-profit-bg)"
-                : "var(--danger-bg)"
-              : meta.bg;
+        <>
+          <div className="pt-kpi-grid">
+            {KPI_META.map((meta) => {
+              const value = meta.getValue(data);
+              const sub = meta.getSub(data);
+              const color = meta.isDynamic
+                ? value >= 0
+                  ? "var(--c-profit)"
+                  : "var(--danger)"
+                : meta.color;
+              const bg = meta.isDynamic
+                ? value >= 0
+                  ? "var(--c-profit-bg)"
+                  : "var(--danger-bg)"
+                : meta.bg;
 
-            return (
-              <div
-                key={meta.key}
-                className="pt-kpi-card"
-                style={{ "--kpi-color": color, "--kpi-bg": bg }}
-              >
-                <div className="pt-kpi-label">
-                  {meta.label}
-                  {meta.tooltip && <InfoTooltip lines={meta.tooltip} />}
+              return (
+                <div
+                  key={meta.key}
+                  className="pt-kpi-card"
+                  style={{ "--kpi-color": color, "--kpi-bg": bg }}
+                >
+                  <div className="pt-kpi-label">
+                    {meta.label}
+                    {meta.tooltip && <InfoTooltip lines={meta.tooltip} />}
+                  </div>
+                  <div className="pt-kpi-value" style={{ color }}>
+                    {formatCurrency(value)}
+                  </div>
+                  {sub && <div className="pt-kpi-sub">{sub}</div>}
                 </div>
-                <div className="pt-kpi-value" style={{ color }}>
-                  {formatCurrency(value)}
-                </div>
-                {sub && <div className="pt-kpi-sub">{sub}</div>}
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+          <WaterfallChart
+            revenueNet={data.revenueNet}
+            cogsTotal={data.cogsTotal}
+            cogsKnown={data.cogsKnownCount > 0}
+            feesTotal={data.feesTotal}
+            shippingCost={data.shippingCost}
+            netProfit={data.netProfit}
+            isPartial={data.isPartial}
+            missingCogsCount={data.missingCogsCount}
+            orderCount={data.orderCount}
+          />
+        </>
       )}
     </div>
   );

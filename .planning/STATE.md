@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Competitive Parity
 status: completed
-stopped_at: Completed 06-waterfall-chart-02-PLAN.md
-last_updated: "2026-03-18T21:34:58.798Z"
-last_activity: 2026-03-18 — Phase 5 complete (all 3 plans, FEEX-01 through FEEX-04 passing)
+stopped_at: Completed 06-waterfall-chart-03-PLAN.md
+last_updated: "2026-03-18T21:46:11Z"
+last_activity: 2026-03-18 — Phase 6 complete (all 3 plans, CHART-01 through CHART-04 browser-verified)
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
-  percent: 11
+  completed_plans: 6
+  percent: 22
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-18 — started v2.0 milestone)
 
 **Core value:** Merchants see what they actually kept — not just what came in — within 10 minutes of installing.
-**Current focus:** Phase 5 — Payout Fee Accuracy
+**Current focus:** Phase 6 — Waterfall Chart — COMPLETE
 
 ## Current Position
 
-Phase: 5 of 9 (Payout Fee Accuracy) — COMPLETE
+Phase: 6 of 9 (Waterfall Chart) — COMPLETE
 Plan: 3 of 3 complete
-Status: Phase complete — ready for Phase 6
-Last activity: 2026-03-18 — Phase 5 complete (all 3 plans, FEEX-01 through FEEX-04 passing)
+Status: Phase complete — ready for Phase 7
+Last activity: 2026-03-18 — Phase 6 complete (all 3 plans, CHART-01 through CHART-04 browser-verified)
 
-Progress: [██░░░░░░░░] 11% (1 of 9 phases complete)
+Progress: [████░░░░░░] 22% (2 of 9 phases complete)
 
 ## Performance Metrics
 
@@ -55,6 +55,7 @@ Progress: [██░░░░░░░░] 11% (1 of 9 phases complete)
 | Phase 05-payout-fee-accuracy P03 | 35min | 2 tasks | 4 files |
 | Phase 06-waterfall-chart P01 | 3min | 2 tasks | 2 files |
 | Phase 06-waterfall-chart P02 | 15min | 2 tasks | 5 files |
+| Phase 06-waterfall-chart P03 | 20min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,9 @@ Recent decisions affecting current work:
 - [Phase 06-waterfall-chart]: 4 shippingCost assertions fail in dashboard.test.js (2 modified DASH tests + 2 new CHART blocks) — all expected RED state for Wave 0
 - [Phase 06-waterfall-chart]: Added babel.config.js with @babel/preset-react to root project — Jest needs JSX parsing for chart.test.js; Vite (web/) already handles JSX via @vitejs/plugin-react
 - [Phase 06-waterfall-chart]: computeWaterfallData null guard is caller responsibility — WaterfallChart conditionally pushes steps before calling the pure transform
+- [Phase 06-waterfall-chart]: cogsKnown computed as cogsKnownCount > 0 in Overview — shows COGS bar if any orders have cost data (not blocked by isPartial flag)
+- [Phase 06-waterfall-chart]: WaterfallModal uses createPortal to document.body (same pattern as FeeCellTooltip) — avoids z-index stacking issues with table containers
+- [Phase 06-waterfall-chart]: Modal triple-close pattern established: X button + overlay click + Escape key with body scroll lock during open state
 
 ### Pending Todos
 
@@ -90,6 +94,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T21:34:58.792Z
-Stopped at: Completed 06-waterfall-chart-02-PLAN.md
+Last session: 2026-03-18T21:46:11Z
+Stopped at: Completed 06-waterfall-chart-03-PLAN.md
 Resume file: None

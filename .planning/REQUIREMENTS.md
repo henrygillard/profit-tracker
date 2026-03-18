@@ -16,10 +16,10 @@ Requirements for the Competitive Parity milestone. Each maps to roadmap phases.
 
 ### Waterfall Chart
 
-- [ ] **CHART-01**: Merchant can view a store-level profit waterfall chart on the Overview screen showing Revenue → COGS → Fees → Shipping → Net Profit for the selected date range
-- [ ] **CHART-02**: Merchant can click any order row in the Orders table to open a per-order waterfall chart showing exactly where that order's revenue went
-- [ ] **CHART-03**: Waterfall charts annotate when COGS is missing ("COGS unknown for X% of items — profit may be overstated") rather than rendering a misleadingly complete breakdown
-- [ ] **CHART-04**: Waterfall charts correctly render loss orders (negative net profit) without visual glitches — the final bar turns red and extends below the baseline
+- [x] **CHART-01**: Merchant can view a store-level profit waterfall chart on the Overview screen showing Revenue → COGS → Fees → Shipping → Net Profit for the selected date range
+- [x] **CHART-02**: Merchant can click any order row in the Orders table to open a per-order waterfall chart showing exactly where that order's revenue went
+- [x] **CHART-03**: Waterfall charts annotate when COGS is missing ("COGS unknown for X% of items — profit may be overstated") rather than rendering a misleadingly complete breakdown
+- [x] **CHART-04**: Waterfall charts correctly render loss orders (negative net profit) without visual glitches — the final bar turns red and extends below the baseline
 - [ ] **CHART-05**: Once ad spend data is available, the waterfall chart gains an "Ad Spend" step between Shipping and Net Profit — showing the full Revenue → COGS → Fees → Shipping → Ad Spend → Net Profit breakdown
 
 ### Margin Alerts
@@ -91,10 +91,10 @@ Which phases cover which requirements. Confirmed during roadmap creation 2026-03
 | FEEX-02 | Phase 5 | Complete |
 | FEEX-03 | Phase 5 | Complete |
 | FEEX-04 | Phase 5 | Complete |
-| CHART-01 | Phase 6 | Pending |
-| CHART-02 | Phase 6 | Pending |
-| CHART-03 | Phase 6 | Pending |
-| CHART-04 | Phase 6 | Pending |
+| CHART-01 | Phase 6 | Complete |
+| CHART-02 | Phase 6 | Complete |
+| CHART-03 | Phase 6 | Complete |
+| CHART-04 | Phase 6 | Complete |
 | CHART-05 | Phase 8 | Pending |
 | ALERT-01 | Phase 7 | Pending |
 | ALERT-02 | Phase 7 | Pending |

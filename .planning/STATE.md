@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Competitive Parity
 status: completed
-stopped_at: Completed 06-waterfall-chart-01-PLAN.md
-last_updated: "2026-03-18T21:29:07.829Z"
+stopped_at: Completed 06-waterfall-chart-02-PLAN.md
+last_updated: "2026-03-18T21:34:58.798Z"
 last_activity: 2026-03-18 — Phase 5 complete (all 3 plans, FEEX-01 through FEEX-04 passing)
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
   percent: 11
 ---
 
@@ -54,6 +54,7 @@ Progress: [██░░░░░░░░] 11% (1 of 9 phases complete)
 | Phase 05-payout-fee-accuracy P02 | 25min | 3 tasks | 7 files |
 | Phase 05-payout-fee-accuracy P03 | 35min | 2 tasks | 4 files |
 | Phase 06-waterfall-chart P01 | 3min | 2 tasks | 2 files |
+| Phase 06-waterfall-chart P02 | 15min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,8 @@ Recent decisions affecting current work:
 - [Phase 05-payout-fee-accuracy]: Portal tooltip (createPortal + pt-info-popup) used instead of native title= attribute in FeeCell — browsers suppress title in table cells
 - [Phase 06-waterfall-chart]: computeWaterfallData imported as named export from WaterfallChart.jsx — consistent with RESEARCH.md pattern
 - [Phase 06-waterfall-chart]: 4 shippingCost assertions fail in dashboard.test.js (2 modified DASH tests + 2 new CHART blocks) — all expected RED state for Wave 0
+- [Phase 06-waterfall-chart]: Added babel.config.js with @babel/preset-react to root project — Jest needs JSX parsing for chart.test.js; Vite (web/) already handles JSX via @vitejs/plugin-react
+- [Phase 06-waterfall-chart]: computeWaterfallData null guard is caller responsibility — WaterfallChart conditionally pushes steps before calling the pure transform
 
 ### Pending Todos
 
@@ -87,6 +90,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T21:29:07.824Z
-Stopped at: Completed 06-waterfall-chart-01-PLAN.md
+Last session: 2026-03-18T21:34:58.792Z
+Stopped at: Completed 06-waterfall-chart-02-PLAN.md
 Resume file: None

@@ -114,7 +114,7 @@ Plans:
 | 3. Profit Dashboard | v1.0 | 5/5 | Complete | 2026-03-14 |
 | 4. Billing | v1.0 | 3/3 | Complete | 2026-03-14 |
 | 5. Payout Fee Accuracy | v2.0 | 3/3 | Complete | 2026-03-18 |
-| 6. Waterfall Chart | v2.0 | 0/3 | Not started | - |
+| 6. Waterfall Chart | 1/3 | In Progress|  | - |
 | 7. Margin Alerts | v2.0 | 0/TBD | Not started | - |
 | 8. Meta Ads + Ads Infrastructure | v2.0 | 0/TBD | Not started | - |
 | 9. Google Ads Integration | v2.0 | 0/TBD | Not started | - |

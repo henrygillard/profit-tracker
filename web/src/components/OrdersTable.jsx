@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { apiFetch } from '../api.js';
+import WaterfallChart from './WaterfallChart.jsx';
 
 const PAGE_SIZE = 50;
 
@@ -94,8 +95,46 @@ function FeeCell({ feesTotal, feeSource }) {
   );
 }
 
+function WaterfallModal({ order, onClose }) {
+  useEffect(() => {
+    // Escape key closes the modal
+    function onKey(e) {
+      if (e.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', onKey);
+    // Lock background scroll while modal is open
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  return createPortal(
+    <div className="pt-modal-overlay" onClick={onClose}>
+      <div className="pt-modal" onClick={e => e.stopPropagation()}>
+        <div className="pt-modal-header">
+          <span>{order.shopifyOrderName} &mdash; Profit Breakdown</span>
+          <button className="pt-modal-close" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <WaterfallChart
+          revenueNet={order.revenueNet}
+          cogsTotal={order.cogsTotal}
+          cogsKnown={order.cogsKnown}
+          feesTotal={order.feesTotal}
+          shippingCost={order.shippingCost}
+          netProfit={order.netProfit}
+        />
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export default function OrdersTable({ dateRange, shopDomain }) {
   const [allOrders, setAllOrders] = useState([]);
+  const [selectedOrder, setSelectedOrder] = useState(null);
   const [sortKey, setSortKey] = useState('processedAt');
   const [sortDir, setSortDir] = useState('desc');
   const [page, setPage] = useState(0);
@@ -181,7 +220,11 @@ export default function OrdersTable({ dateRange, shopDomain }) {
                   : null;
 
                 return (
-                  <tr key={order.orderId}>
+                  <tr
+                    key={order.orderId}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setSelectedOrder(order)}
+                  >
                     <td style={{ color: 'var(--text-2)', fontSize: 12 }}>
                       {order.processedAt
                         ? new Date(order.processedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -220,6 +263,10 @@ export default function OrdersTable({ dateRange, shopDomain }) {
       )}
       {loading && page > 0 && (
         <div className="pt-load-more" style={{ color: 'var(--text-2)', fontSize: 13 }}>Loading more…</div>
+      )}
+
+      {selectedOrder && (
+        <WaterfallModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />
       )}
     </div>
   );

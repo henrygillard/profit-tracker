@@ -58,6 +58,7 @@ describe('DASH-01: GET /api/dashboard/overview', () => {
     expect(res.body).toMatchObject({
       revenueNet: expect.any(Number),
       feesTotal: expect.any(Number),
+      shippingCost: expect.any(Number),
       cogsTotal: expect.any(Number),
       netProfit: expect.any(Number),
       orderCount: expect.any(Number),
@@ -94,6 +95,7 @@ describe('DASH-02: GET /api/dashboard/orders', () => {
         revenueNet: 100.0,
         cogsTotal: 30.0,
         feesTotal: 5.0,
+        shippingCost: 15.0,
         netProfit: 65.0,
         marginPct: 65.0,
         cogsKnown: true,
@@ -111,6 +113,7 @@ describe('DASH-02: GET /api/dashboard/orders', () => {
       revenueNet: expect.any(Number),
       cogsTotal: expect.any(Number),
       feesTotal: expect.any(Number),
+      shippingCost: expect.any(Number),
       feeSource: expect.stringMatching(/^(verified|estimated|pending)$/),
       netProfit: expect.any(Number),
       marginPct: expect.any(Number),
@@ -268,5 +271,55 @@ describe('DASH-05: Partial-COGS visibility', () => {
     expect(res.status).toBe(200);
     expect(res.body[0].cogsKnown).toBe(false);
     expect(res.body[0].cogsTotal).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CHART-01: overview shippingCost — exact value assertion
+// ---------------------------------------------------------------------------
+describe('CHART-01: overview includes shippingCost', () => {
+  test('shippingCost field equals the summed value from aggregate', async () => {
+    prisma.orderProfit.aggregate
+      .mockResolvedValueOnce({
+        _sum: { revenueNet: 800.0, feesTotal: 40.0, shippingCost: 25.0, cogsTotal: 300.0 },
+        _count: { _all: 8 },
+      })
+      .mockResolvedValueOnce({
+        _sum: { cogsTotal: 300.0, netProfit: 435.0 },
+        _count: { _all: 8 },
+      });
+    prisma.orderProfit.count.mockResolvedValueOnce(0);
+
+    const res = await request(app)
+      .get('/api/dashboard/overview?from=2024-01-01&to=2024-12-31');
+
+    expect(res.status).toBe(200);
+    expect(res.body.shippingCost).toBe(25);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CHART-02: orders shippingCost per order
+// ---------------------------------------------------------------------------
+describe('CHART-02: orders list includes shippingCost per order', () => {
+  test('each order in response includes shippingCost field', async () => {
+    prisma.orderProfit.findMany.mockResolvedValueOnce([
+      {
+        orderId: 'gid://shopify/Order/5',
+        revenueNet: 120.0,
+        cogsTotal: 40.0,
+        feesTotal: 6.0,
+        shippingCost: 8.0,
+        netProfit: 66.0,
+        cogsKnown: true,
+        feeSource: 'verified',
+      },
+    ]);
+
+    const res = await request(app)
+      .get('/api/dashboard/orders?from=2024-01-01&to=2024-12-31');
+
+    expect(res.status).toBe(200);
+    expect(res.body[0].shippingCost).toBe(8);
   });
 });

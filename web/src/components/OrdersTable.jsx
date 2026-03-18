@@ -23,6 +23,22 @@ function gidToNumericId(gid) {
   return parts[parts.length - 1];
 }
 
+function FeeCell({ feesTotal, feeSource }) {
+  if (feeSource === 'pending') {
+    return <span className="pt-badge pt-badge-info">Pending</span>;
+  }
+  if (feeSource === 'estimated') {
+    return (
+      <span title="Rate-table estimate — not from settled payout">
+        {formatCurrency(feesTotal)}
+        <span className="pt-badge pt-badge-warning" style={{ marginLeft: 4 }}>Est.</span>
+      </span>
+    );
+  }
+  // verified — exact from settled payout, tooltip for transparency
+  return <span title="Exact fee from settled payout">{formatCurrency(feesTotal)}</span>;
+}
+
 export default function OrdersTable({ dateRange, shopDomain }) {
   const [allOrders, setAllOrders] = useState([]);
   const [sortKey, setSortKey] = useState('processedAt');
@@ -127,7 +143,7 @@ export default function OrdersTable({ dateRange, shopDomain }) {
                         ? formatCurrency(order.cogsTotal)
                         : <span className="pt-badge pt-badge-warning">Unknown</span>}
                     </td>
-                    <td className="pt-col-num">{formatCurrency(order.feesTotal)}</td>
+                    <td className="pt-col-num"><FeeCell feesTotal={order.feesTotal} feeSource={order.feeSource} /></td>
                     <td className="pt-col-num" style={{ color: profitColor, fontWeight: 600 }}>
                       {order.netProfit !== null ? formatCurrency(order.netProfit) : '—'}
                     </td>

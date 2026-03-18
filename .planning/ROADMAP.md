@@ -23,7 +23,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Milestone Goal:** Close the three retention risks identified post-v1.0 — verify and fix fee accuracy, add high-value UX differentiators (waterfall chart + margin alerts), and ship Meta + Google Ads integration to compete with Triple Whale and BeProfit.
 
-- [ ] **Phase 5: Payout Fee Accuracy** - Verify and fix per-order Shopify Payments fees; establish verified/estimated/pending status per order
+- [x] **Phase 5: Payout Fee Accuracy** - Verify and fix per-order Shopify Payments fees; establish verified/estimated/pending status per order (completed 2026-03-18)
 - [ ] **Phase 6: Waterfall Chart** - Store-level and per-order profit waterfall visualization built on verified fee data
 - [ ] **Phase 7: Margin Alerts** - Configurable low-margin threshold alerts with dashboard banner and nav badge
 - [ ] **Phase 8: Meta Ads + Ads Infrastructure** - Shared ads schema, token encryption, Meta OAuth, campaign spend sync, and Blended ROAS
@@ -108,7 +108,7 @@ Plans:
 | 2. Sync and Profit Engine | v1.0 | 7/7 | Complete | 2026-03-14 |
 | 3. Profit Dashboard | v1.0 | 5/5 | Complete | 2026-03-14 |
 | 4. Billing | v1.0 | 3/3 | Complete | 2026-03-14 |
-| 5. Payout Fee Accuracy | 2/3 | In Progress|  | - |
+| 5. Payout Fee Accuracy | 3/3 | Complete   | 2026-03-18 | - |
 | 6. Waterfall Chart | v2.0 | 0/TBD | Not started | - |
 | 7. Margin Alerts | v2.0 | 0/TBD | Not started | - |
 | 8. Meta Ads + Ads Infrastructure | v2.0 | 0/TBD | Not started | - |

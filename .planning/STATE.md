@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Competitive Parity
 status: planning
-stopped_at: Completed 05-payout-fee-accuracy-02-PLAN.md
-last_updated: "2026-03-18T20:43:22.214Z"
+stopped_at: Completed 05-payout-fee-accuracy-03-PLAN.md
+last_updated: "2026-03-18T20:59:42.198Z"
 last_activity: 2026-03-18 — v2.0 roadmap created (Phases 5-9)
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-03-18 — started v2.0 milestone)
 
 ## Current Position
 
-Phase: 5 of 9 (Payout Fee Accuracy)
-Plan: — (not yet planned)
-Status: Ready to plan
-Last activity: 2026-03-18 — v2.0 roadmap created (Phases 5-9)
+Phase: 5 of 9 (Payout Fee Accuracy) — COMPLETE
+Plan: 3 of 3 complete
+Status: Phase complete — ready for Phase 6
+Last activity: 2026-03-18 — Phase 5 complete (all 3 plans, FEEX-01 through FEEX-04 passing)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██░░░░░░░░] 11% (1 of 9 phases complete)
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [░░░░░░░░░░] 0%
 *Updated after each plan completion*
 | Phase 05-payout-fee-accuracy P01 | 15min | 2 tasks | 5 files |
 | Phase 05-payout-fee-accuracy P02 | 25min | 3 tasks | 7 files |
+| Phase 05-payout-fee-accuracy P03 | 35min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -67,6 +68,7 @@ Recent decisions affecting current work:
 - [Phase 05-payout-fee-accuracy]: Extended tests/__mocks__/prisma.js with order, lineItem, shopConfig, orderProfit.upsert to support full upsertOrder test execution
 - [Phase 05-payout-fee-accuracy]: determineFeeSourceFromOrder never returns 'verified' — only syncPayouts may set that state; invariant enforced by design
 - [Phase 05-payout-fee-accuracy]: jest.mock call-through wrapper chosen for FEEX-04 spy tests because route destructures upsertOrder at module require time — spyOn cannot intercept cached binding
+- [Phase 05-payout-fee-accuracy]: Portal tooltip (createPortal + pt-info-popup) used instead of native title= attribute in FeeCell — browsers suppress title in table cells
 
 ### Pending Todos
 
@@ -82,6 +84,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T20:43:22.210Z
-Stopped at: Completed 05-payout-fee-accuracy-02-PLAN.md
+Last session: 2026-03-18T20:59:42.195Z
+Stopped at: Completed 05-payout-fee-accuracy-03-PLAN.md
 Resume file: None

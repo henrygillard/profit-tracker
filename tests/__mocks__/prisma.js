@@ -15,7 +15,21 @@ const prisma = {
     }),
     count: jest.fn().mockResolvedValue(0),
     findMany: jest.fn().mockResolvedValue([]),
+    upsert: jest.fn().mockResolvedValue({}),
+  },
+  order: {
+    findUnique: jest.fn().mockResolvedValue(null),
+    upsert: jest.fn().mockResolvedValue({}),
+  },
+  lineItem: {
+    deleteMany: jest.fn().mockResolvedValue({}),
+    createMany: jest.fn().mockResolvedValue({}),
+  },
+  shopConfig: {
+    findFirst: jest.fn().mockResolvedValue(null),
+    upsert: jest.fn().mockResolvedValue({}),
   },
   $queryRaw: jest.fn().mockResolvedValue([]),
+  $transaction: jest.fn(ops => Promise.all(ops)),
 };
 module.exports = { prisma };

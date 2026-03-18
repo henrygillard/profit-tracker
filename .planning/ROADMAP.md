@@ -40,7 +40,12 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
   2. Each order in the Orders table displays a "Verified", "Estimated", or "Pending" fee status badge — never blank or silently mixed
   3. Orders not yet rolled into a payout show "Pending" instead of a number that looks exact but is estimated
   4. When an order is refunded, the fee reversal uses the exact settled fee amount rather than applying an estimated reversal percentage
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Schema migration (feeSource column) + failing test scaffolds
+- [ ] 05-02-PLAN.md — Backend feeSource logic (profitEngine, syncOrders, syncPayouts, refund handler)
+- [ ] 05-03-PLAN.md — API serialization + FeeCell badge component + UI checkpoint
 
 ### Phase 6: Waterfall Chart
 **Goal**: Merchants can see exactly where their revenue went — at both the store level and per individual order — through a waterfall decomposition chart built on verified fee data
@@ -103,7 +108,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 | 2. Sync and Profit Engine | v1.0 | 7/7 | Complete | 2026-03-14 |
 | 3. Profit Dashboard | v1.0 | 5/5 | Complete | 2026-03-14 |
 | 4. Billing | v1.0 | 3/3 | Complete | 2026-03-14 |
-| 5. Payout Fee Accuracy | v2.0 | 0/TBD | Not started | - |
+| 5. Payout Fee Accuracy | v2.0 | 0/3 | Planning | - |
 | 6. Waterfall Chart | v2.0 | 0/TBD | Not started | - |
 | 7. Margin Alerts | v2.0 | 0/TBD | Not started | - |
 | 8. Meta Ads + Ads Infrastructure | v2.0 | 0/TBD | Not started | - |

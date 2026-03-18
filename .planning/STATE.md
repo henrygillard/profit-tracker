@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Competitive Parity
 status: planning
-stopped_at: Completed 05-payout-fee-accuracy-01-PLAN.md
-last_updated: "2026-03-18T20:34:15.400Z"
+stopped_at: Completed 05-payout-fee-accuracy-02-PLAN.md
+last_updated: "2026-03-18T20:43:22.214Z"
 last_activity: 2026-03-18 — v2.0 roadmap created (Phases 5-9)
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -51,6 +51,7 @@ Progress: [░░░░░░░░░░] 0%
 
 *Updated after each plan completion*
 | Phase 05-payout-fee-accuracy P01 | 15min | 2 tasks | 5 files |
+| Phase 05-payout-fee-accuracy P02 | 25min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,8 @@ Recent decisions affecting current work:
 - [Roadmap v2.0]: Phase 9 has an external dependency (Google developer token approval) that cannot be controlled with code — apply during Phase 8 kickoff
 - [Phase 05-payout-fee-accuracy]: feeSource defaults to 'estimated' so all pre-Phase-5 rows are safe without data loss
 - [Phase 05-payout-fee-accuracy]: Extended tests/__mocks__/prisma.js with order, lineItem, shopConfig, orderProfit.upsert to support full upsertOrder test execution
+- [Phase 05-payout-fee-accuracy]: determineFeeSourceFromOrder never returns 'verified' — only syncPayouts may set that state; invariant enforced by design
+- [Phase 05-payout-fee-accuracy]: jest.mock call-through wrapper chosen for FEEX-04 spy tests because route destructures upsertOrder at module require time — spyOn cannot intercept cached binding
 
 ### Pending Todos
 
@@ -79,6 +82,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T20:34:15.397Z
-Stopped at: Completed 05-payout-fee-accuracy-01-PLAN.md
+Last session: 2026-03-18T20:43:22.210Z
+Stopped at: Completed 05-payout-fee-accuracy-02-PLAN.md
 Resume file: None

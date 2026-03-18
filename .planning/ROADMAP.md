@@ -108,7 +108,7 @@ Plans:
 | 2. Sync and Profit Engine | v1.0 | 7/7 | Complete | 2026-03-14 |
 | 3. Profit Dashboard | v1.0 | 5/5 | Complete | 2026-03-14 |
 | 4. Billing | v1.0 | 3/3 | Complete | 2026-03-14 |
-| 5. Payout Fee Accuracy | 1/3 | In Progress|  | - |
+| 5. Payout Fee Accuracy | 2/3 | In Progress|  | - |
 | 6. Waterfall Chart | v2.0 | 0/TBD | Not started | - |
 | 7. Margin Alerts | v2.0 | 0/TBD | Not started | - |
 | 8. Meta Ads + Ads Infrastructure | v2.0 | 0/TBD | Not started | - |

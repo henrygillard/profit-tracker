@@ -123,3 +123,35 @@ model ShopConfig {
 
   @@map("shop_configs")
 }
+
+// AdConnection — stores encrypted OAuth tokens for ad platforms (Meta, Google)
+model AdConnection {
+  id             Int      @id @default(autoincrement())
+  shop           String
+  platform       String   // 'meta' | 'google'
+  encryptedToken String   @map("encrypted_token")
+  accountId      String   @map("account_id")
+  accountName    String?  @map("account_name")
+  connectedAt    DateTime @default(now()) @map("connected_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([shop, platform])
+  @@index([shop])
+  @@map("ad_connections")
+}
+
+// AdSpend — daily ad spend records per campaign, synced from ad platforms
+model AdSpend {
+  id           Int      @id @default(autoincrement())
+  shop         String
+  platform     String
+  date         DateTime @db.Date
+  campaignId   String   @map("campaign_id")
+  campaignName String   @map("campaign_name")
+  spend        Decimal  @db.Decimal(12, 2)
+  syncedAt     DateTime @default(now()) @map("synced_at")
+
+  @@unique([shop, platform, date, campaignId])
+  @@index([shop, platform, date])
+  @@map("ad_spend")
+}

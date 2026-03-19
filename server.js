@@ -69,6 +69,7 @@ app.use('/webhooks', require('./routes/webhooks'));
 const { verifySessionToken } = require('./lib/verifySessionToken');
 app.use('/api', verifySessionToken);
 app.use('/api', require('./routes/api'));
+app.use('/api/ads', require('./routes/ads'));
 
 /**
  * GET /health — Liveness probe for Railway / uptime monitors

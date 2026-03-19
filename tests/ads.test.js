@@ -179,9 +179,9 @@ describe('ADS-03: GET /api/ads/campaigns — campaign spend list', () => {
       expect(false).toBe(true); // Force failure until Plan 08-03
       return;
     }
-    prisma.adSpend.findMany.mockResolvedValueOnce([
-      { campaignId: 'cmp_1', campaignName: 'Summer Sale', spend: 100.00, platform: 'meta', date: new Date('2024-01-15') },
-      { campaignId: 'cmp_2', campaignName: 'Retargeting', spend: 75.00, platform: 'meta', date: new Date('2024-01-15') },
+    prisma.adSpend.groupBy.mockResolvedValueOnce([
+      { campaignId: 'cmp_1', campaignName: 'Summer Sale', platform: 'meta', _sum: { spend: 100.00 } },
+      { campaignId: 'cmp_2', campaignName: 'Retargeting', platform: 'meta', _sum: { spend: 75.00 } },
     ]);
 
     const res = await request(app)

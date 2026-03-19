@@ -195,16 +195,39 @@ router.get('/dashboard/overview', async (req, res) => {
     _count: { _all: true },
   });
 
+  // adSpend: null when no Meta Ads connection, number when connected (ADS-02)
+  // When adSpend is present, subtract from netProfit for true margin view
+  const shop = req.shopDomain;
+  const fromDate = new Date(from);
+  const toDate = new Date(to);
+
+  const adConn = await prisma.adConnection.findFirst({
+    where: { shop, platform: 'meta' },
+  });
+  let adSpend = null;
+  if (adConn) {
+    const adRows = await prisma.adSpend.groupBy({
+      by: ['platform'],
+      where: { shop, date: { gte: fromDate, lte: toDate } },
+      _sum: { spend: true },
+    });
+    adSpend = adRows.reduce((sum, r) => sum + Number(r._sum.spend || 0), 0);
+  }
+
+  const baseNetProfit = Number(knownAgg._sum.netProfit ?? 0);
+  const netProfitFinal = adSpend !== null ? baseNetProfit - adSpend : baseNetProfit;
+
   return res.json({
     revenueNet: Number(agg._sum.revenueNet ?? 0),
     feesTotal: Number(agg._sum.feesTotal ?? 0),
     shippingCost: Number(agg._sum.shippingCost ?? 0),
     cogsTotal: Number(knownAgg._sum.cogsTotal ?? 0),
-    netProfit: Number(knownAgg._sum.netProfit ?? 0),
+    netProfit: netProfitFinal,
     orderCount: agg._count._all,
     cogsKnownCount: knownAgg._count._all,
     missingCogsCount: missingCogs,
     isPartial: missingCogs > 0,
+    adSpend,
   });
 });
 

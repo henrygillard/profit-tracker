@@ -132,7 +132,9 @@
       "WebFetch(domain:developers.google.com)",
       "WebFetch(domain:developers.facebook.com)",
       "WebFetch(domain:opteo.com)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(head -20 grep -n \"document.body\\\\|<script>\\\\|<head>\\\\|<body>\" routes/google-ads-auth.js)",
+      "Bash(cat /Users/henry/code/profit-tracker/.planning/phases/09-google-ads-integration/*-VERIFICATION.md)"
     ]
   }
 }

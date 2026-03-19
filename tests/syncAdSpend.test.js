@@ -226,13 +226,13 @@ describe('syncAdSpend: no connection', () => {
 // ---------------------------------------------------------------------------
 
 describe('syncAdSpend: unsupported platform', () => {
-  test('throws for unsupported platform (e.g. google)', async () => {
+  test('throws for unsupported platform (e.g. tiktok)', async () => {
     if (!syncAdSpend) {
       expect(false).toBe(true);
       return;
     }
 
-    await expect(syncAdSpend('test-shop.myshopify.com', 'google')).rejects.toThrow('unsupported platform');
+    await expect(syncAdSpend('test-shop.myshopify.com', 'tiktok')).rejects.toThrow('unsupported platform');
   });
 });
 

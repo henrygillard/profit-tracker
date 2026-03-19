@@ -133,4 +133,4 @@ Plans:
 | 6. Waterfall Chart | 3/3 | Complete   | 2026-03-18 | - |
 | 7. Margin Alerts | 3/3 | Complete   | 2026-03-19 | - |
 | 8. Meta Ads + Ads Infrastructure | 4/4 | Complete   | 2026-03-19 | - |
-| 9. Google Ads Integration | v2.0 | 0/4 | Not started | - |
+| 9. Google Ads Integration | 1/4 | In Progress|  | - |

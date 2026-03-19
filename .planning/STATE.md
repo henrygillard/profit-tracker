@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Competitive Parity
 status: completed
-stopped_at: Phase 9 context gathered
-last_updated: "2026-03-19T15:07:41.160Z"
+stopped_at: Completed 09-google-ads-integration-01-PLAN.md
+last_updated: "2026-03-19T16:03:03.621Z"
 last_activity: 2026-03-19 — Phase 7 complete (all 3 plans, ALERT-01 through ALERT-04 browser-verified)
 progress:
   total_phases: 5
   completed_phases: 4
-  total_plans: 13
-  completed_plans: 13
+  total_plans: 17
+  completed_plans: 14
   percent: 33
 ---
 
@@ -63,6 +63,7 @@ Progress: [█████░░░░░] 33% (3 of 9 phases complete)
 | Phase 08-meta-ads-ads-infrastructure P02 | 8min | 2 tasks | 3 files |
 | Phase 08-meta-ads-ads-infrastructure P03 | 5min | 2 tasks | 7 files |
 | Phase 08-meta-ads-ads-infrastructure P04 | 2min | 2 tasks | 5 files |
+| Phase 09-google-ads-integration P01 | 5min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,9 @@ Recent decisions affecting current work:
 - [Phase 08-meta-ads-ads-infrastructure]: AdsView connected state inferred from spend.total > 0 || campaigns.length > 0 — no dedicated status endpoint needed
 - [Phase 08-meta-ads-ads-infrastructure]: pt-kpi-grid updated from repeat(4, 1fr) to repeat(auto-fit, minmax(160px, 1fr)) to accommodate 5th Ad Spend KPI card
 - [Phase 08-meta-ads-ads-infrastructure]: handleConnect uses window.top.location.href for top-level Shopify iframe navigation to /ads/auth
+- [Phase 09-google-ads-integration]: google-auth-library@^9.15.1 used (not v10) — Node 16 engine compatibility
+- [Phase 09-google-ads-integration]: OAuth2Client.prototype.getToken spy is correct intercept for google-auth-library token exchange (not global.fetch)
+- [Phase 09-google-ads-integration]: ADS-06 campaigns test passes GREEN immediately — existing groupBy is platform-agnostic, no change needed
 
 ### Pending Todos
 
@@ -119,6 +123,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T15:07:41.156Z
-Stopped at: Phase 9 context gathered
-Resume file: .planning/phases/09-google-ads-integration/09-CONTEXT.md
+Last session: 2026-03-19T16:03:03.617Z
+Stopped at: Completed 09-google-ads-integration-01-PLAN.md
+Resume file: None

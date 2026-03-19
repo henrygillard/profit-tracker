@@ -37,9 +37,9 @@ Requirements for the Competitive Parity milestone. Each maps to roadmap phases.
 
 ### Google Ads Integration
 
-- [ ] **ADS-04**: Merchant can connect their Google Ads account via OAuth and disconnect it — the flow uses a refresh token and the existing embedded iframe top-level redirect pattern (requires Google Ads developer token at minimum Test Account Access)
-- [ ] **ADS-05**: Total Google Ads spend for the selected date range is pulled via GAQL, displayed as a separate "Google Ads Spend" line in the P&L KPI cards (distinct from Meta spend), and deducted from net profit — cost values are correctly converted from micros to dollars
-- [ ] **ADS-06**: Merchant can view a per-campaign Google Ads spend breakdown table alongside the Meta campaign table in the Ads view
+- [x] **ADS-04**: Merchant can connect their Google Ads account via OAuth and disconnect it — the flow uses a refresh token and the existing embedded iframe top-level redirect pattern (requires Google Ads developer token at minimum Test Account Access)
+- [x] **ADS-05**: Total Google Ads spend for the selected date range is pulled via GAQL, displayed as a separate "Google Ads Spend" line in the P&L KPI cards (distinct from Meta spend), and deducted from net profit — cost values are correctly converted from micros to dollars
+- [x] **ADS-06**: Merchant can view a per-campaign Google Ads spend breakdown table alongside the Meta campaign table in the Ads view
 
 ### Ads Dashboard
 
@@ -103,9 +103,9 @@ Which phases cover which requirements. Confirmed during roadmap creation 2026-03
 | ADS-01 | Phase 8 | Complete |
 | ADS-02 | Phase 8 | Complete |
 | ADS-03 | Phase 8 | Complete |
-| ADS-04 | Phase 9 | Pending |
-| ADS-05 | Phase 9 | Pending |
-| ADS-06 | Phase 9 | Pending |
+| ADS-04 | Phase 9 | Complete |
+| ADS-05 | Phase 9 | Complete |
+| ADS-06 | Phase 9 | Complete |
 | ADS-07 | Phase 8 | Complete |
 
 **Coverage:**

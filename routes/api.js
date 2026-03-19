@@ -359,4 +359,34 @@ router.get('/dashboard/trend', async (req, res) => {
   return res.json(serialized);
 });
 
+// ── Settings ──────────────────────────────────────────────────────────────
+
+// GET /api/settings — returns shop-wide configuration (threshold and future settings)
+router.get('/settings', async (req, res) => {
+  const config = await prisma.shopConfig.findFirst({
+    where: { shop: req.shopDomain },
+    select: { marginAlertThreshold: true },
+  });
+  return res.json({
+    marginAlertThreshold: config?.marginAlertThreshold !== null && config?.marginAlertThreshold !== undefined
+      ? Number(config.marginAlertThreshold)
+      : 20.0,
+  });
+});
+
+// PUT /api/settings — updates shop-wide configuration
+router.put('/settings', async (req, res) => {
+  const { marginAlertThreshold } = req.body;
+  const parsed = parseFloat(marginAlertThreshold);
+  if (isNaN(parsed) || parsed < 0 || parsed > 100) {
+    return res.status(400).json({ error: 'marginAlertThreshold must be 0–100' });
+  }
+  await prisma.shopConfig.upsert({
+    where: { shop: req.shopDomain },
+    update: { marginAlertThreshold: parsed },
+    create: { shop: req.shopDomain, marginAlertThreshold: parsed },
+  });
+  return res.json({ marginAlertThreshold: parsed });
+});
+
 module.exports = router;

@@ -20,7 +20,7 @@ Requirements for the Competitive Parity milestone. Each maps to roadmap phases.
 - [x] **CHART-02**: Merchant can click any order row in the Orders table to open a per-order waterfall chart showing exactly where that order's revenue went
 - [x] **CHART-03**: Waterfall charts annotate when COGS is missing ("COGS unknown for X% of items — profit may be overstated") rather than rendering a misleadingly complete breakdown
 - [x] **CHART-04**: Waterfall charts correctly render loss orders (negative net profit) without visual glitches — the final bar turns red and extends below the baseline
-- [ ] **CHART-05**: Once ad spend data is available, the waterfall chart gains an "Ad Spend" step between Shipping and Net Profit — showing the full Revenue → COGS → Fees → Shipping → Ad Spend → Net Profit breakdown
+- [x] **CHART-05**: Once ad spend data is available, the waterfall chart gains an "Ad Spend" step between Shipping and Net Profit — showing the full Revenue → COGS → Fees → Shipping → Ad Spend → Net Profit breakdown
 
 ### Margin Alerts
 
@@ -31,9 +31,9 @@ Requirements for the Competitive Parity milestone. Each maps to roadmap phases.
 
 ### Meta Ads Integration
 
-- [ ] **ADS-01**: Merchant can connect their Meta Ads account via OAuth (Marketing API, `ads_read` scope) and disconnect it from the app's settings — the OAuth flow works correctly from within the Shopify Admin embedded iframe
-- [ ] **ADS-02**: Total Meta ad spend for the selected date range is pulled from the Ads Insights API, displayed as an "Ad Spend" line in the store-level P&L KPI cards, and deducted from net profit
-- [ ] **ADS-03**: Merchant can view a per-campaign spend breakdown table showing campaign name and spend for the selected period — providing visibility into which campaigns consumed the budget
+- [x] **ADS-01**: Merchant can connect their Meta Ads account via OAuth (Marketing API, `ads_read` scope) and disconnect it from the app's settings — the OAuth flow works correctly from within the Shopify Admin embedded iframe
+- [x] **ADS-02**: Total Meta ad spend for the selected date range is pulled from the Ads Insights API, displayed as an "Ad Spend" line in the store-level P&L KPI cards, and deducted from net profit
+- [x] **ADS-03**: Merchant can view a per-campaign spend breakdown table showing campaign name and spend for the selected period — providing visibility into which campaigns consumed the budget
 
 ### Google Ads Integration
 
@@ -43,7 +43,7 @@ Requirements for the Competitive Parity milestone. Each maps to roadmap phases.
 
 ### Ads Dashboard
 
-- [ ] **ADS-07**: The Ads view displays Blended ROAS (total Shopify revenue / total ad spend across all connected platforms) for the selected date range — clearly labeled as "Blended ROAS" to distinguish it from platform-reported ROAS
+- [x] **ADS-07**: The Ads view displays Blended ROAS (total Shopify revenue / total ad spend across all connected platforms) for the selected date range — clearly labeled as "Blended ROAS" to distinguish it from platform-reported ROAS
 
 ## Future Requirements
 
@@ -95,18 +95,18 @@ Which phases cover which requirements. Confirmed during roadmap creation 2026-03
 | CHART-02 | Phase 6 | Complete |
 | CHART-03 | Phase 6 | Complete |
 | CHART-04 | Phase 6 | Complete |
-| CHART-05 | Phase 8 | Pending |
+| CHART-05 | Phase 8 | Complete |
 | ALERT-01 | Phase 7 | Complete |
 | ALERT-02 | Phase 7 | Complete |
 | ALERT-03 | Phase 7 | Complete |
 | ALERT-04 | Phase 7 | Complete |
-| ADS-01 | Phase 8 | Pending |
-| ADS-02 | Phase 8 | Pending |
-| ADS-03 | Phase 8 | Pending |
+| ADS-01 | Phase 8 | Complete |
+| ADS-02 | Phase 8 | Complete |
+| ADS-03 | Phase 8 | Complete |
 | ADS-04 | Phase 9 | Pending |
 | ADS-05 | Phase 9 | Pending |
 | ADS-06 | Phase 9 | Pending |
-| ADS-07 | Phase 8 | Pending |
+| ADS-07 | Phase 8 | Complete |
 
 **Coverage:**
 - v2.0 requirements: 20 total

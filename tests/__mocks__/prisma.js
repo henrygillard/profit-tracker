@@ -40,6 +40,12 @@ const prisma = {
     groupBy: jest.fn().mockResolvedValue([]),
     deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
   },
+  oAuthState: {
+    create: jest.fn().mockResolvedValue({ id: 1, state: 'test-state', shop: 'test-shop.myshopify.com' }),
+    findUnique: jest.fn().mockResolvedValue(null),
+    delete: jest.fn().mockResolvedValue({}),
+    deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+  },
   $queryRaw: jest.fn().mockResolvedValue([]),
   $transaction: jest.fn(ops => Promise.all(ops)),
 };

@@ -116,7 +116,22 @@
       "Bash(find /Users/henry/code/profit-tracker -type f -name *bill* -o -name *subscr* -o -name *charge* -o -name *auth*)",
       "Bash(grep -r \"BILLING_TEST_MODE\\\\|myshopify\\\\|402\\\\|billing\" /Users/henry/code/profit-tracker/.env*)",
       "Bash(node:*)",
-      "Bash(/Users/henry/code/profit-tracker/prisma/migrations/20260317_add_product_id_to_line_items/migration.sql:*)"
+      "Bash(/Users/henry/code/profit-tracker/prisma/migrations/20260317_add_product_id_to_line_items/migration.sql:*)",
+      "Bash(shopify version:*)",
+      "Bash(nvm ls:*)",
+      "Bash(nvm run:*)",
+      "Bash(nvm exec:*)",
+      "Skill(gsd:new-milestone)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:recharts.github.io)",
+      "WebFetch(domain:admanage.ai)",
+      "WebFetch(domain:trueprofit.io)",
+      "WebFetch(domain:community.shopify.dev)",
+      "WebFetch(domain:ads-developers.googleblog.com)",
+      "WebFetch(domain:trackfunnels.com)",
+      "WebFetch(domain:developers.google.com)",
+      "WebFetch(domain:developers.facebook.com)",
+      "WebFetch(domain:opteo.com)"
     ]
   }
 }

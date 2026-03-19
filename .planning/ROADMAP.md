@@ -72,7 +72,12 @@ Plans:
   2. Merchant can set a shop-wide margin alert threshold (default 20%) from a settings screen; the setting persists across browser sessions
   3. SKUs with negative margin (losing money on every sale) always appear as CRITICAL alerts regardless of the configured threshold — this cannot be suppressed
   4. The Products nav tab shows a badge with the count of at-risk SKUs so the problem is visible before navigating to the Products view
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — TDD Wave 0: failing test stubs (alerts.test.js) + schema migration (marginAlertThreshold)
+- [ ] 07-02-PLAN.md — Backend: GET/PUT /api/settings + GET /api/alerts/margin (turn tests GREEN)
+- [ ] 07-03-PLAN.md — Frontend: MarginAlertBanner + SettingsScreen + nav badge + human checkpoint
 
 ### Phase 8: Meta Ads + Ads Infrastructure
 **Goal**: Merchants can connect their Meta Ads account, see their total ad spend deducted from net profit, view a per-campaign spend breakdown, and see Blended ROAS — with all shared ads infrastructure (schema, encryption, OAuth, sync scheduler) in place for Google Ads to layer on in Phase 9
@@ -115,6 +120,6 @@ Plans:
 | 4. Billing | v1.0 | 3/3 | Complete | 2026-03-14 |
 | 5. Payout Fee Accuracy | v2.0 | 3/3 | Complete | 2026-03-18 |
 | 6. Waterfall Chart | 3/3 | Complete   | 2026-03-18 | - |
-| 7. Margin Alerts | v2.0 | 0/TBD | Not started | - |
+| 7. Margin Alerts | v2.0 | 0/3 | Not started | - |
 | 8. Meta Ads + Ads Infrastructure | v2.0 | 0/TBD | Not started | - |
 | 9. Google Ads Integration | v2.0 | 0/TBD | Not started | - |

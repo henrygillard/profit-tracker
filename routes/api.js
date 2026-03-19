@@ -389,4 +389,72 @@ router.put('/settings', async (req, res) => {
   return res.json({ marginAlertThreshold: parsed });
 });
 
+// ── Margin Alerts ─────────────────────────────────────────────────────────
+
+// GET /api/alerts/margin?from=ISO&to=ISO — returns at-risk SKUs below threshold
+router.get('/alerts/margin', async (req, res) => {
+  const { from, to } = req.query;
+
+  // Fetch threshold from ShopConfig (default 20 when no row exists)
+  const config = await prisma.shopConfig.findFirst({
+    where: { shop: req.shopDomain },
+    select: { marginAlertThreshold: true },
+  });
+  const threshold = config?.marginAlertThreshold !== null && config?.marginAlertThreshold !== undefined
+    ? Number(config.marginAlertThreshold)
+    : 20.0;
+
+  // Re-use the same SQL pattern as /api/dashboard/products
+  // BOOL_AND(op.cogs_known) guard excludes SKUs with unknown COGS
+  const fromDate = from ? new Date(from) : new Date(0);
+  const toDate = to ? new Date(to) : new Date();
+  const rows = await prisma.$queryRaw`
+    SELECT
+      li.variant_id,
+      li.sku,
+      MAX(li.product_name)                                          AS product_name,
+      SUM(li.unit_price * li.quantity)                              AS revenue,
+      SUM(op.net_profit * (li.unit_price * li.quantity)
+          / NULLIF(op.revenue_net, 0))                              AS net_profit_attr,
+      BOOL_AND(op.cogs_known)                                       AS all_cogs_known
+    FROM line_items li
+    JOIN orders o ON o.id = li.order_id
+    JOIN order_profits op ON op.order_id = li.order_id
+    WHERE o.shop = ${req.shopDomain}
+      AND o.processed_at >= ${fromDate}
+      AND o.processed_at <= ${toDate}
+    GROUP BY li.variant_id, li.sku
+  `;
+
+  const atRisk = rows
+    .filter(r => r.all_cogs_known)          // Exclude unknown-COGS SKUs (no false positives)
+    .map(r => {
+      const revenue    = Number(r.revenue ?? 0);
+      const netProfit  = r.net_profit_attr !== null && r.net_profit_attr !== undefined
+        ? Number(r.net_profit_attr)
+        : null;
+      const marginPct  = revenue > 0 && netProfit !== null
+        ? (netProfit / revenue) * 100
+        : null;
+      const isCritical = marginPct !== null && marginPct < 0;
+      const isAtRisk   = marginPct !== null && (marginPct < threshold || isCritical);
+      return {
+        variantId:   r.variant_id   ?? null,
+        sku:         r.sku          ?? null,
+        productName: r.product_name ?? null,
+        marginPct,
+        threshold,
+        isCritical,
+        isAtRisk,
+      };
+    })
+    .filter(r => r.isAtRisk);
+
+  return res.json({
+    threshold,
+    atRiskCount: atRisk.length,
+    atRiskSkus: atRisk,
+  });
+});
+
 module.exports = router;

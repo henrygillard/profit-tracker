@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Competitive Parity
 status: completed
-stopped_at: Completed 07-margin-alerts-01-PLAN.md
-last_updated: "2026-03-19T05:06:06.685Z"
+stopped_at: Completed 07-margin-alerts-02-PLAN.md
+last_updated: "2026-03-19T05:09:33.486Z"
 last_activity: 2026-03-18 — Phase 6 complete (all 3 plans, CHART-01 through CHART-04 browser-verified)
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 9
-  completed_plans: 7
+  completed_plans: 8
   percent: 22
 ---
 
@@ -57,6 +57,7 @@ Progress: [████░░░░░░] 22% (2 of 9 phases complete)
 | Phase 06-waterfall-chart P02 | 15min | 2 tasks | 5 files |
 | Phase 06-waterfall-chart P03 | 20min | 3 tasks | 2 files |
 | Phase 07-margin-alerts P01 | 2min | 2 tasks | 3 files |
+| Phase 07-margin-alerts P02 | 3min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,8 @@ Recent decisions affecting current work:
 - [Phase 06-waterfall-chart]: Modal triple-close pattern established: X button + overlay click + Escape key with body scroll lock during open state
 - [Phase 07-margin-alerts]: Migration applied via prisma db execute (not migrate dev) because Railway shadow DB is missing shop_sessions table — same pattern used by all prior migrations in this project
 - [Phase 07-margin-alerts]: alerts.test.js follows dashboard.test.js makeApp() pattern exactly — consistent test infrastructure across all API test files
+- [Phase 07-margin-alerts]: from/to query params made optional in GET /api/alerts/margin — existing test stubs call without params and expect 200; enforcing hard 400 would break the GREEN target
+- [Phase 07-margin-alerts]: isCritical=true for negative-margin SKUs regardless of threshold — ALERT-03 invariant; negative margin always triggers alert even at threshold=0
 
 ### Pending Todos
 
@@ -97,6 +100,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T05:06:06.680Z
-Stopped at: Completed 07-margin-alerts-01-PLAN.md
+Last session: 2026-03-19T05:09:33.481Z
+Stopped at: Completed 07-margin-alerts-02-PLAN.md
 Resume file: None

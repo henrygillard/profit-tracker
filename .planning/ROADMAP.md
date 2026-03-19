@@ -89,7 +89,13 @@ Plans:
   3. Merchant can view a per-campaign spend breakdown table showing campaign name and spend for the selected period
   4. The waterfall chart gains an "Ad Spend" step between Shipping and Net Profit once Meta Ads is connected, showing the full Revenue → COGS → Fees → Shipping → Ad Spend → Net Profit breakdown
   5. The Ads view displays Blended ROAS (total Shopify revenue / total ad spend) clearly labeled to distinguish it from platform-reported ROAS
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — Schema migration (AdConnection + AdSpend) + lib/encrypt.js + Wave 0 test stubs
+- [ ] 08-02-PLAN.md — Meta OAuth routes (ads-auth.js) + GDPR webhook extension
+- [ ] 08-03-PLAN.md — Meta Insights sync (syncAdSpend.js) + scheduler + ads API endpoints + overview adSpend field
+- [ ] 08-04-PLAN.md — Frontend: AdsView + Ad Spend KPI card + CHART-05 waterfall step + human checkpoint
 
 **Prerequisites:**
 - Apply for Google Ads developer token at Phase 8 kickoff (external approval needed before Phase 9 can begin)
@@ -103,7 +109,13 @@ Plans:
   1. Merchant can connect a Google Ads account via OAuth (refresh token flow) from within the Shopify Admin iframe and disconnect it from settings
   2. Total Google Ads spend appears as a separate "Google Ads Spend" line in the P&L KPI cards (distinct from Meta spend line) with cost values correctly converted from micros to dollars
   3. Google campaign spend rows appear alongside Meta campaign rows in the Ads campaign breakdown table
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — Schema migration (AdConnection + AdSpend) + lib/encrypt.js + Wave 0 test stubs
+- [ ] 08-02-PLAN.md — Meta OAuth routes (ads-auth.js) + GDPR webhook extension
+- [ ] 08-03-PLAN.md — Meta Insights sync (syncAdSpend.js) + scheduler + ads API endpoints + overview adSpend field
+- [ ] 08-04-PLAN.md — Frontend: AdsView + Ad Spend KPI card + CHART-05 waterfall step + human checkpoint
 
 **Prerequisites:**
 - Google Ads developer token confirmed at minimum Test Account Access (applied during Phase 8)

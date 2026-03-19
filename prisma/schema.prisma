@@ -119,6 +119,7 @@ model ShopConfig {
   bulkOpId               String?  @map("bulk_op_id")             // in-flight bulk operation GID
   createdAt              DateTime @default(now()) @map("created_at")
   updatedAt              DateTime @updatedAt @map("updated_at")
+  marginAlertThreshold   Decimal  @default(20) @map("margin_alert_threshold") @db.Decimal(6, 2)
 
   @@map("shop_configs")
 }

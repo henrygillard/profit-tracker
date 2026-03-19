@@ -231,3 +231,57 @@ describe('ADS-07: ROAS — Return on Ad Spend calculation', () => {
     expect(res.body.roas).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// ADS-04: DELETE /api/ads/disconnect?platform=google — Google disconnect
+// ---------------------------------------------------------------------------
+
+describe('ADS-04: DELETE /api/ads/disconnect?platform=google', () => {
+  test('deletes Google AdConnection and returns 200 { ok: true }', async () => {
+    if (!adsApiRouter) {
+      expect(false).toBe(true); // RED until Plan 09-03 adds ?platform= support
+      return;
+    }
+    prisma.adConnection.deleteMany.mockResolvedValueOnce({ count: 1 });
+
+    const res = await request(app)
+      .delete('/api/ads/disconnect?platform=google');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ ok: true });
+    expect(prisma.adConnection.deleteMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          shop: 'test-shop.myshopify.com',
+          platform: 'google',
+        }),
+      })
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ADS-06: GET /api/ads/campaigns — includes Google rows
+// ---------------------------------------------------------------------------
+
+describe('ADS-06: GET /api/ads/campaigns — includes Google rows', () => {
+  test('returns campaign rows for both meta and google platforms', async () => {
+    if (!adsApiRouter) {
+      expect(false).toBe(true); // RED until Plan 09-03
+      return;
+    }
+    prisma.adSpend.groupBy.mockResolvedValueOnce([
+      { campaignId: 'cmp_1', campaignName: 'Brand', platform: 'meta', _sum: { spend: 100.00 } },
+      { campaignId: 'cmp_2', campaignName: 'Google Brand', platform: 'google', _sum: { spend: 50.00 } },
+    ]);
+
+    const res = await request(app)
+      .get('/api/ads/campaigns?from=2024-01-01&to=2024-12-31');
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBe(2);
+    const googleRow = res.body.find(r => r.platform === 'google');
+    expect(googleRow).toBeDefined();
+  });
+});

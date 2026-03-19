@@ -323,3 +323,79 @@ describe('CHART-02: orders list includes shippingCost per order', () => {
     expect(res.body[0].shippingCost).toBe(8);
   });
 });
+
+// ---------------------------------------------------------------------------
+// ADS-05: overview returns metaAdSpend, googleAdSpend, totalAdSpend
+// ---------------------------------------------------------------------------
+
+describe('ADS-05: GET /api/dashboard/overview — metaAdSpend, googleAdSpend, totalAdSpend', () => {
+  test('returns separate ad spend fields when both platforms connected', async () => {
+    // Standard aggregate/count mocks (copied from existing DASH-01 overview test)
+    prisma.orderProfit.aggregate
+      .mockResolvedValueOnce({
+        _sum: { revenueNet: 500.0, feesTotal: 25.0, shippingCost: 10.0, cogsTotal: 150.0 },
+        _count: { _all: 5 },
+      })
+      .mockResolvedValueOnce({
+        _sum: { cogsTotal: 150.0, netProfit: 315.0 },
+        _count: { _all: 5 },
+      });
+    prisma.orderProfit.count.mockResolvedValueOnce(0);
+
+    // Both meta and google connections exist
+    prisma.adConnection.findFirst
+      .mockResolvedValueOnce({ shop: 'test-shop.myshopify.com', platform: 'meta' })
+      .mockResolvedValueOnce({ shop: 'test-shop.myshopify.com', platform: 'google' });
+
+    // Two separate groupBy calls: first for meta, second for google
+    prisma.adSpend.groupBy
+      .mockResolvedValueOnce([{ platform: 'meta', _sum: { spend: 30 } }])
+      .mockResolvedValueOnce([{ platform: 'google', _sum: { spend: 20 } }]);
+
+    const res = await request(app)
+      .get('/api/dashboard/overview?from=2024-01-01&to=2024-12-31');
+
+    expect(res.status).toBe(200);
+    // RED until Plan 09-03 extends the overview query
+    expect(res.body).toMatchObject({
+      metaAdSpend: 30,
+      googleAdSpend: 20,
+      totalAdSpend: 50,
+    });
+    expect(res.body.adSpend).toBe(50); // backward compat field = totalAdSpend
+  });
+
+  test('googleAdSpend is null when no Google connection', async () => {
+    // Standard aggregate/count mocks
+    prisma.orderProfit.aggregate
+      .mockResolvedValueOnce({
+        _sum: { revenueNet: 500.0, feesTotal: 25.0, shippingCost: 10.0, cogsTotal: 150.0 },
+        _count: { _all: 5 },
+      })
+      .mockResolvedValueOnce({
+        _sum: { cogsTotal: 150.0, netProfit: 315.0 },
+        _count: { _all: 5 },
+      });
+    prisma.orderProfit.count.mockResolvedValueOnce(0);
+
+    // Meta connected, Google not connected
+    prisma.adConnection.findFirst
+      .mockResolvedValueOnce({ shop: 'test-shop.myshopify.com', platform: 'meta' })
+      .mockResolvedValueOnce(null);
+
+    // Only meta groupBy called
+    prisma.adSpend.groupBy
+      .mockResolvedValueOnce([{ platform: 'meta', _sum: { spend: 30 } }]);
+
+    const res = await request(app)
+      .get('/api/dashboard/overview?from=2024-01-01&to=2024-12-31');
+
+    expect(res.status).toBe(200);
+    // RED until Plan 09-03 extends the overview query
+    expect(res.body).toMatchObject({
+      metaAdSpend: 30,
+      googleAdSpend: null,
+      totalAdSpend: 30,
+    });
+  });
+});

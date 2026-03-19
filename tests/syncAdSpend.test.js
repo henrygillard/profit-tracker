@@ -4,6 +4,7 @@
 //
 // Covers: ADS-02 backend sync (fetch Meta Insights, upsert AdSpend rows),
 //         pagination loop, parseFloat(spend), error-190 no-throw behavior.
+//         ADS-04/ADS-06: Google platform branch (Plan 09-03).
 
 // Set required env vars before any module loads
 process.env.ADS_ENCRYPTION_KEY = process.env.ADS_ENCRYPTION_KEY ||
@@ -20,6 +21,7 @@ jest.mock('../lib/encrypt', () => ({
 global.fetch = jest.fn();
 
 const { prisma } = require('../lib/prisma');
+const { OAuth2Client } = require('google-auth-library');
 
 // Attempt to load syncAdSpend — fails RED until lib/syncAdSpend.js is implemented
 let syncAdSpend = null;
@@ -231,5 +233,110 @@ describe('syncAdSpend: unsupported platform', () => {
     }
 
     await expect(syncAdSpend('test-shop.myshopify.com', 'google')).rejects.toThrow('unsupported platform');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Google platform: no longer throws unsupported (Plan 09-03)
+// ---------------------------------------------------------------------------
+
+describe('syncAdSpend: Google platform no longer throws unsupported', () => {
+  test('does not throw "unsupported platform" for platform=google when no AdConnection', async () => {
+    if (!syncAdSpend) {
+      expect(false).toBe(true); // RED until Plan 09-03 replaces the platform guard
+      return;
+    }
+    prisma.adConnection.findFirst.mockResolvedValueOnce(null); // no connection = early return
+    await expect(syncAdSpend('test-shop.myshopify.com', 'google')).resolves.not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Google happy path: fetches GAQL, converts micros, upserts AdSpend rows
+// ---------------------------------------------------------------------------
+
+describe('syncAdSpend: Google happy path', () => {
+  test('fetches GAQL, upserts AdSpend with micros/1e6 conversion', async () => {
+    if (!syncAdSpend) {
+      expect(false).toBe(true); // RED until Plan 09-03 adds Google branch
+      return;
+    }
+
+    prisma.adConnection.findFirst.mockResolvedValueOnce({
+      shop: 'test-shop.myshopify.com',
+      platform: 'google',
+      accountId: '1234567890',
+      encryptedToken: 'enc:refresh-token',
+    });
+
+    // Mock OAuth2Client.getAccessToken to return a short-lived access token
+    const getAccessTokenSpy = jest
+      .spyOn(OAuth2Client.prototype, 'getAccessToken')
+      .mockResolvedValue({ token: 'access-token' });
+
+    // Mock GAQL response from Google Ads API
+    global.fetch.mockResolvedValueOnce({
+      json: async () => ({
+        results: [
+          {
+            campaign: { id: '111', name: 'Brand' },
+            metrics: { costMicros: '1500000' },
+            segments: { date: '2024-01-01' },
+          },
+        ],
+        nextPageToken: null,
+      }),
+    });
+
+    prisma.adSpend.upsert.mockResolvedValue({});
+
+    await syncAdSpend('test-shop.myshopify.com', 'google');
+
+    expect(prisma.adSpend.upsert).toHaveBeenCalledTimes(1);
+    const firstCall = prisma.adSpend.upsert.mock.calls[0][0];
+    expect(firstCall.create.spend).toBeCloseTo(1.5); // 1500000 / 1_000_000
+    expect(firstCall.create.campaignId).toBe('111');
+
+    getAccessTokenSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Google invalid_grant: deletes AdConnection, does not throw
+// ---------------------------------------------------------------------------
+
+describe('syncAdSpend: Google invalid_grant', () => {
+  test('invalid_grant from getAccessToken deletes AdConnection and does not throw', async () => {
+    if (!syncAdSpend) {
+      expect(false).toBe(true); // RED until Plan 09-03
+      return;
+    }
+
+    prisma.adConnection.findFirst.mockResolvedValueOnce({
+      shop: 'test-shop.myshopify.com',
+      platform: 'google',
+      accountId: '1234567890',
+      encryptedToken: 'enc:refresh-token',
+    });
+
+    const invalidGrantError = Object.assign(new Error('invalid_grant'), { message: 'invalid_grant' });
+    const getAccessTokenSpy = jest
+      .spyOn(OAuth2Client.prototype, 'getAccessToken')
+      .mockRejectedValue(invalidGrantError);
+
+    prisma.adConnection.deleteMany.mockResolvedValueOnce({ count: 1 });
+
+    await expect(syncAdSpend('test-shop.myshopify.com', 'google')).resolves.not.toThrow();
+
+    expect(prisma.adConnection.deleteMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          shop: 'test-shop.myshopify.com',
+          platform: 'google',
+        }),
+      })
+    );
+
+    getAccessTokenSpy.mockRestore();
   });
 });

@@ -30,11 +30,14 @@ key-files:
   modified:
     - web/src/components/AdsView.jsx
     - web/src/components/Overview.jsx
+    - routes/ads-auth.js
+    - routes/google-ads-auth.js
 
 key-decisions:
   - "metaConnected inferred from spend.meta > 0 || campaigns.some(c => c.platform === 'meta') — consistent with Phase 08 pattern of no dedicated status endpoint"
   - "googleConnected inferred from spend.google > 0 || campaigns.some(c => c.platform === 'google') — same inference pattern"
   - "Campaign table key changed to platform-campaignId composite to avoid collisions when both platforms have campaigns"
+  - "iframe-escape script must be placed at end of <body> — running in <head> causes document.body to be null before body element is parsed"
 
 patterns-established:
   - "Platform section pattern: each ad platform gets its own <div className=pt-ads-platform-section> with independent connect/disconnect"
@@ -43,7 +46,7 @@ patterns-established:
 requirements-completed: [ADS-04, ADS-05, ADS-06]
 
 # Metrics
-duration: 10min
+duration: 15min
 completed: 2026-03-19
 ---
 
@@ -53,11 +56,11 @@ completed: 2026-03-19
 
 ## Performance
 
-- **Duration:** ~10 min
+- **Duration:** ~15 min
 - **Started:** 2026-03-19T19:50:25Z
-- **Completed:** 2026-03-19T19:59:00Z
-- **Tasks:** 2 of 3 (Task 3 is human-verify checkpoint — awaiting approval)
-- **Files modified:** 2
+- **Completed:** 2026-03-19T20:05:00Z
+- **Tasks:** 3 of 3 (Task 3 human-verify checkpoint — approved)
+- **Files modified:** 4
 
 ## Accomplishments
 - AdsView restructured into two independent platform sections: Meta Ads and Google Ads, each with its own connect/disconnect controls
@@ -72,11 +75,15 @@ Each task was committed atomically:
 
 1. **Task 1: Extend AdsView.jsx with Google connection card** - `64016c4` (feat)
 2. **Task 2: Add Google Ads Spend KPI card to Overview.jsx** - `b3f0048` (feat)
-3. **Task 3: Human verification checkpoint** - pending human approval
+3. **Task 3: Human verification checkpoint** - approved by user
+
+**Bug fix (found during checkpoint review):** `3781158` (fix: move iframe-escape script to end of body)
 
 ## Files Created/Modified
 - `web/src/components/AdsView.jsx` - Restructured into Meta+Google platform sections; per-platform connect/disconnect handlers; campaign platform badges
 - `web/src/components/Overview.jsx` - Added googleAdSpend conditional KPI card after Meta Ad Spend card
+- `routes/ads-auth.js` - iframe-escape script moved to end of `<body>` (bug fix)
+- `routes/google-ads-auth.js` - iframe-escape script moved to end of `<body>` (bug fix)
 
 ## Decisions Made
 - Connection state for each platform inferred from spend breakdown and campaign platform field (no dedicated status endpoint) — consistent with Phase 08 decision
@@ -85,7 +92,20 @@ Each task was committed atomically:
 
 ## Deviations from Plan
 
-None - plan executed exactly as written.
+### Auto-fixed Issues
+
+**1. [Rule 1 - Bug] iframe-escape script ran before `<body>` existed, causing null reference**
+- **Found during:** Task 3 (human verification checkpoint)
+- **Issue:** Both `routes/ads-auth.js` and `routes/google-ads-auth.js` had a `<script>` tag in `<head>` that referenced `document.body` to apply a CSS class for iframe-escape detection. Because `<body>` had not been parsed yet when the script ran, `document.body` was `null`, causing a JavaScript TypeError on every OAuth redirect page load.
+- **Fix:** Moved the `<script>` block from `<head>` to the end of `<body>` in both files so the DOM element exists when the script executes.
+- **Files modified:** `routes/ads-auth.js`, `routes/google-ads-auth.js`
+- **Verification:** User observed the fix in-browser and approved the checkpoint.
+- **Committed in:** `3781158` (separate fix commit, applied before human approval)
+
+---
+
+**Total deviations:** 1 auto-fixed (Rule 1 — bug)
+**Impact on plan:** Fix was essential for correct OAuth redirect behavior in both Meta and Google auth flows. No scope creep.
 
 ## Issues Encountered
 

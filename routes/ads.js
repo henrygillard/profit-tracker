@@ -98,14 +98,22 @@ router.get('/campaigns', async (req, res) => {
 });
 
 /**
- * DELETE /api/ads/disconnect — Remove Meta Ads connection for the authenticated shop
+ * DELETE /api/ads/disconnect?platform=meta|google — Remove Ad connection for the authenticated shop
+ *
+ * Query params:
+ *   platform: 'meta' | 'google' (required)
  *
  * Returns: 200 { ok: true }
  */
 router.delete('/disconnect', async (req, res) => {
+  const { platform } = req.query;
+  if (!platform || !['meta', 'google'].includes(platform)) {
+    return res.status(400).json({ error: 'platform query param required: meta or google' });
+  }
+
   try {
     await prisma.adConnection.deleteMany({
-      where: { shop: req.shopDomain, platform: 'meta' },
+      where: { shop: req.shopDomain, platform },
     });
     return res.json({ ok: true });
   } catch (err) {

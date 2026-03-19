@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Competitive Parity
 status: completed
-stopped_at: Completed 07-margin-alerts-02-PLAN.md
-last_updated: "2026-03-19T05:09:33.486Z"
-last_activity: 2026-03-18 — Phase 6 complete (all 3 plans, CHART-01 through CHART-04 browser-verified)
+stopped_at: Completed 07-margin-alerts-03-PLAN.md
+last_updated: "2026-03-19T06:00:00.000Z"
+last_activity: 2026-03-19 — Phase 7 complete (all 3 plans, ALERT-01 through ALERT-04 browser-verified)
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 9
-  completed_plans: 8
-  percent: 22
+  completed_plans: 9
+  percent: 33
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-18 — started v2.0 milestone)
 
 **Core value:** Merchants see what they actually kept — not just what came in — within 10 minutes of installing.
-**Current focus:** Phase 6 — Waterfall Chart — COMPLETE
+**Current focus:** Phase 7 — Margin Alerts — COMPLETE
 
 ## Current Position
 
-Phase: 6 of 9 (Waterfall Chart) — COMPLETE
+Phase: 7 of 9 (Margin Alerts) — COMPLETE
 Plan: 3 of 3 complete
-Status: Phase complete — ready for Phase 7
-Last activity: 2026-03-18 — Phase 6 complete (all 3 plans, CHART-01 through CHART-04 browser-verified)
+Status: Phase complete — ready for Phase 8
+Last activity: 2026-03-19 — Phase 7 complete (all 3 plans, ALERT-01 through ALERT-04 browser-verified)
 
-Progress: [████░░░░░░] 22% (2 of 9 phases complete)
+Progress: [█████░░░░░] 33% (3 of 9 phases complete)
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Progress: [████░░░░░░] 22% (2 of 9 phases complete)
 | Phase 06-waterfall-chart P03 | 20min | 3 tasks | 2 files |
 | Phase 07-margin-alerts P01 | 2min | 2 tasks | 3 files |
 | Phase 07-margin-alerts P02 | 3min | 2 tasks | 1 files |
+| Phase 07-margin-alerts P03 | 30min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,9 @@ Recent decisions affecting current work:
 - [Phase 07-margin-alerts]: alerts.test.js follows dashboard.test.js makeApp() pattern exactly — consistent test infrastructure across all API test files
 - [Phase 07-margin-alerts]: from/to query params made optional in GET /api/alerts/margin — existing test stubs call without params and expect 200; enforcing hard 400 would break the GREEN target
 - [Phase 07-margin-alerts]: isCritical=true for negative-margin SKUs regardless of threshold — ALERT-03 invariant; negative margin always triggers alert even at threshold=0
+- [Phase 07-margin-alerts]: CRITICAL alert section is a separate JSX element with no dismissed condition — ALERT-03 enforced in UI layer independently of backend
+- [Phase 07-margin-alerts]: MarginAlertBanner mounted in Overview.jsx (not App.jsx) so dateRange prop is available directly; onAtRiskCount callback bubbles count up to App without a second fetch
+- [Phase 07-margin-alerts]: .pt-tab-badge uses absolute positioning on tab button to show at-risk count without causing layout shift
 
 ### Pending Todos
 
@@ -100,6 +104,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T05:09:33.481Z
-Stopped at: Completed 07-margin-alerts-02-PLAN.md
+Last session: 2026-03-19T06:00:00.000Z
+Stopped at: Completed 07-margin-alerts-03-PLAN.md
 Resume file: None

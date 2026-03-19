@@ -278,6 +278,18 @@ export default function Overview({ dateRange, onDateChange, onAtRiskCount }) {
                 <div className="pt-kpi-sub">Meta Ads</div>
               </div>
             )}
+            {data.googleAdSpend !== null && data.googleAdSpend !== undefined && (
+              <div
+                className="pt-kpi-card"
+                style={{ "--kpi-color": "var(--c-ads)", "--kpi-bg": "var(--c-ads-bg)" }}
+              >
+                <div className="pt-kpi-label">Google Ads Spend</div>
+                <div className="pt-kpi-value" style={{ color: "var(--c-ads)" }}>
+                  {formatCurrency(data.googleAdSpend)}
+                </div>
+                <div className="pt-kpi-sub">Google Ads</div>
+              </div>
+            )}
           </div>
           <WaterfallChart
             revenueNet={data.revenueNet}

@@ -24,10 +24,10 @@ Requirements for the Competitive Parity milestone. Each maps to roadmap phases.
 
 ### Margin Alerts
 
-- [ ] **ALERT-01**: Dashboard displays a dismissible banner listing all SKUs whose margin % has fallen below the merchant's configured threshold, showing product name, current margin %, and the threshold
-- [ ] **ALERT-02**: Merchant can configure a shop-wide margin alert threshold (default 20%) from a settings screen — stored in the database, persists across sessions
-- [ ] **ALERT-03**: Products with negative margin (losing money on every sale) always display as a CRITICAL alert regardless of the configured threshold — this cannot be suppressed by threshold config
-- [ ] **ALERT-04**: The Products nav tab shows a badge with the count of at-risk SKUs so merchants see the problem without navigating to the Products view
+- [x] **ALERT-01**: Dashboard displays a dismissible banner listing all SKUs whose margin % has fallen below the merchant's configured threshold, showing product name, current margin %, and the threshold
+- [x] **ALERT-02**: Merchant can configure a shop-wide margin alert threshold (default 20%) from a settings screen — stored in the database, persists across sessions
+- [x] **ALERT-03**: Products with negative margin (losing money on every sale) always display as a CRITICAL alert regardless of the configured threshold — this cannot be suppressed by threshold config
+- [x] **ALERT-04**: The Products nav tab shows a badge with the count of at-risk SKUs so merchants see the problem without navigating to the Products view
 
 ### Meta Ads Integration
 
@@ -96,10 +96,10 @@ Which phases cover which requirements. Confirmed during roadmap creation 2026-03
 | CHART-03 | Phase 6 | Complete |
 | CHART-04 | Phase 6 | Complete |
 | CHART-05 | Phase 8 | Pending |
-| ALERT-01 | Phase 7 | Pending |
-| ALERT-02 | Phase 7 | Pending |
-| ALERT-03 | Phase 7 | Pending |
-| ALERT-04 | Phase 7 | Pending |
+| ALERT-01 | Phase 7 | Complete |
+| ALERT-02 | Phase 7 | Complete |
+| ALERT-03 | Phase 7 | Complete |
+| ALERT-04 | Phase 7 | Complete |
 | ADS-01 | Phase 8 | Pending |
 | ADS-02 | Phase 8 | Pending |
 | ADS-03 | Phase 8 | Pending |

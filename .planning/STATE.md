@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Competitive Parity
 status: completed
-stopped_at: Completed 08-meta-ads-ads-infrastructure-03-PLAN.md
-last_updated: "2026-03-19T06:20:31.643Z"
+stopped_at: "Completed 08-meta-ads-ads-infrastructure-04-PLAN.md (checkpoint:human-verify Task 3 pending)"
+last_updated: "2026-03-19T06:26:05.461Z"
 last_activity: 2026-03-19 — Phase 7 complete (all 3 plans, ALERT-01 through ALERT-04 browser-verified)
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 13
-  completed_plans: 12
+  completed_plans: 13
   percent: 33
 ---
 
@@ -62,6 +62,7 @@ Progress: [█████░░░░░] 33% (3 of 9 phases complete)
 | Phase 08-meta-ads-ads-infrastructure P01 | 15min | 2 tasks | 6 files |
 | Phase 08-meta-ads-ads-infrastructure P02 | 8min | 2 tasks | 3 files |
 | Phase 08-meta-ads-ads-infrastructure P03 | 5min | 2 tasks | 7 files |
+| Phase 08-meta-ads-ads-infrastructure P04 | 2min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,9 @@ Recent decisions affecting current work:
 - [Phase 08-meta-ads-ads-infrastructure]: routes/ads.js mounted at /api/ads (not /api) so routes use /spend etc without /ads/ prefix — matches test mount point
 - [Phase 08-meta-ads-ads-infrastructure]: roas field added to GET /api/ads/spend response (revenueNet/total, null when total=0) for ADS-07 without second frontend fetch
 - [Phase 08-meta-ads-ads-infrastructure]: adSpend null/number distinction in overview: null=no connection, number(incl 0)=connected; netProfit adjusted by adSpend when connected
+- [Phase 08-meta-ads-ads-infrastructure]: AdsView connected state inferred from spend.total > 0 || campaigns.length > 0 — no dedicated status endpoint needed
+- [Phase 08-meta-ads-ads-infrastructure]: pt-kpi-grid updated from repeat(4, 1fr) to repeat(auto-fit, minmax(160px, 1fr)) to accommodate 5th Ad Spend KPI card
+- [Phase 08-meta-ads-ads-infrastructure]: handleConnect uses window.top.location.href for top-level Shopify iframe navigation to /ads/auth
 
 ### Pending Todos
 
@@ -115,6 +119,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T06:20:31.639Z
-Stopped at: Completed 08-meta-ads-ads-infrastructure-03-PLAN.md
+Last session: 2026-03-19T06:26:05.457Z
+Stopped at: Completed 08-meta-ads-ads-infrastructure-04-PLAN.md (checkpoint:human-verify Task 3 pending)
 Resume file: None

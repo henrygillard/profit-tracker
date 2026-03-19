@@ -34,9 +34,10 @@ export function computeWaterfallData(steps) {
 function getCellColor(entry) {
   if (entry.type === 'start')    return 'var(--c-revenue)';
   if (entry.type === 'subtract') {
-    if (entry.label === 'COGS')     return 'var(--c-cogs)';
-    if (entry.label === 'Fees')     return 'var(--c-fees)';
-    if (entry.label === 'Shipping') return 'var(--text-2)';
+    if (entry.label === 'COGS')      return 'var(--c-cogs)';
+    if (entry.label === 'Fees')      return 'var(--c-fees)';
+    if (entry.label === 'Shipping')  return 'var(--text-2)';
+    if (entry.label === 'Ad Spend')  return 'var(--c-ads)';
   }
   if (entry.type === 'total') {
     return entry.value >= 0 ? 'var(--c-profit)' : 'var(--danger)';
@@ -77,7 +78,8 @@ function WaterfallTooltip({ active, payload }) {
 export default function WaterfallChart({
   revenueNet, cogsTotal, cogsKnown = true,
   feesTotal, shippingCost, netProfit,
-  isPartial = false, missingCogsCount = 0, orderCount = 0
+  isPartial = false, missingCogsCount = 0, orderCount = 0,
+  adSpend = null
 }) {
   // Empty state guard — no chart when no revenue
   if (!revenueNet) {
@@ -91,6 +93,9 @@ export default function WaterfallChart({
   }
   steps.push({ label: 'Fees',     value: feesTotal,     type: 'subtract' });
   steps.push({ label: 'Shipping', value: shippingCost,  type: 'subtract' });
+  if (adSpend && adSpend > 0) {
+    steps.push({ label: 'Ad Spend', value: adSpend, type: 'subtract' });
+  }
   if (cogsKnown && netProfit !== null) {
     steps.push({ label: 'Net Profit', value: netProfit, type: 'total'    });
   }

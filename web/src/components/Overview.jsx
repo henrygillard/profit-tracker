@@ -266,6 +266,18 @@ export default function Overview({ dateRange, onDateChange, onAtRiskCount }) {
                 </div>
               );
             })}
+            {data.adSpend !== null && data.adSpend !== undefined && (
+              <div
+                className="pt-kpi-card"
+                style={{ "--kpi-color": "var(--c-ads)", "--kpi-bg": "var(--c-ads-bg)" }}
+              >
+                <div className="pt-kpi-label">Ad Spend</div>
+                <div className="pt-kpi-value" style={{ color: "var(--c-ads)" }}>
+                  {formatCurrency(data.adSpend)}
+                </div>
+                <div className="pt-kpi-sub">Meta Ads</div>
+              </div>
+            )}
           </div>
           <WaterfallChart
             revenueNet={data.revenueNet}
@@ -277,6 +289,7 @@ export default function Overview({ dateRange, onDateChange, onAtRiskCount }) {
             isPartial={data.isPartial}
             missingCogsCount={data.missingCogsCount}
             orderCount={data.orderCount}
+            adSpend={data.adSpend}
           />
         </>
       )}

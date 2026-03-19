@@ -4,7 +4,8 @@ import { apiFetch } from '../api.js';
 export default function AdsView({ dateRange }) {
   const [spendData, setSpendData] = useState(null);
   const [campaigns, setCampaigns] = useState([]);
-  const [connected, setConnected] = useState(false);
+  const [metaConnected, setMetaConnected] = useState(false);
+  const [googleConnected, setGoogleConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -19,8 +20,15 @@ export default function AdsView({ dateRange }) {
       .then(([spend, cams]) => {
         setSpendData(spend);
         setCampaigns(cams);
-        // If total > 0 or campaigns exist, consider connected
-        setConnected(spend.total > 0 || cams.length > 0);
+        // Infer connection state from data — no dedicated status endpoint needed
+        setMetaConnected(
+          (spend.meta != null && spend.meta > 0) ||
+          cams.some((c) => c.platform === 'meta')
+        );
+        setGoogleConnected(
+          (spend.google != null && spend.google > 0) ||
+          cams.some((c) => c.platform === 'google')
+        );
         setLoading(false);
       })
       .catch(() => {
@@ -29,17 +37,22 @@ export default function AdsView({ dateRange }) {
       });
   }, [dateRange?.from, dateRange?.to]);
 
-  function handleConnect() {
-    // Must navigate top-level window (not iframe) to /ads/auth
+  function handleConnectMeta() {
     const shop = new URLSearchParams(window.location.search).get('shop') || '';
-    const url = `/ads/auth?shop=${encodeURIComponent(shop)}&embedded=1`;
-    window.top.location.href = url;
+    window.top.location.href = `/ads/auth?shop=${encodeURIComponent(shop)}&embedded=1`;
   }
 
-  async function handleDisconnect() {
+  function handleConnectGoogle() {
+    const shop = new URLSearchParams(window.location.search).get('shop') || '';
+    window.top.location.href = `/google-ads/auth?shop=${encodeURIComponent(shop)}&embedded=1`;
+  }
+
+  async function handleDisconnect(platform) {
     try {
-      await apiFetch('/api/ads/disconnect', { method: 'DELETE' });
-      setConnected(false);
+      await apiFetch(`/api/ads/disconnect?platform=${platform}`, { method: 'DELETE' });
+      if (platform === 'meta') { setMetaConnected(false); }
+      if (platform === 'google') { setGoogleConnected(false); }
+      // Reload spend/campaigns after disconnect
       setSpendData(null);
       setCampaigns([]);
     } catch {
@@ -53,6 +66,8 @@ export default function AdsView({ dateRange }) {
     spendData?.total > 0 && revenueNet > 0
       ? (revenueNet / spendData.total).toFixed(2)
       : null;
+
+  const anyConnected = metaConnected || googleConnected;
 
   return (
     <div className="pt-ads-view">
@@ -76,64 +91,90 @@ export default function AdsView({ dateRange }) {
 
       {!loading && (
         <>
-          {/* Connection status */}
-          {!connected ? (
-            <div className="pt-ads-connect-card">
-              <p>Connect your Meta Ads account to see spend data in your profit dashboard.</p>
-              <button className="pt-btn pt-btn-primary" onClick={handleConnect}>
-                Connect Meta Ads
-              </button>
-            </div>
-          ) : (
-            <>
+          {/* Meta Ads section */}
+          <div className="pt-ads-platform-section">
+            <h3 className="pt-ads-platform-title">Meta Ads</h3>
+            {!metaConnected ? (
+              <div className="pt-ads-connect-card">
+                <p>Connect your Meta Ads account to see spend data in your profit dashboard.</p>
+                <button className="pt-btn pt-btn-primary" onClick={handleConnectMeta}>
+                  Connect Meta Ads
+                </button>
+              </div>
+            ) : (
               <div className="pt-ads-status">
                 <span className="pt-ads-connected-label">Meta Ads connected</span>
-                <button className="pt-btn pt-btn-danger-outline" onClick={handleDisconnect}>
+                <button className="pt-btn pt-btn-danger-outline" onClick={() => handleDisconnect('meta')}>
                   Disconnect
                 </button>
               </div>
+            )}
+          </div>
 
-              {/* Blended ROAS card */}
-              {roas !== null && (
-                <div
-                  className="pt-kpi-card"
-                  style={{ '--kpi-color': 'var(--c-ads)', '--kpi-bg': 'var(--c-ads-bg)', marginBottom: 24 }}
-                >
-                  <div className="pt-kpi-label">Blended ROAS</div>
-                  <div className="pt-kpi-value" style={{ color: 'var(--c-ads)' }}>{roas}x</div>
-                  <div className="pt-kpi-sub">Total revenue / total ad spend &middot; all platforms</div>
-                </div>
-              )}
+          {/* Google Ads section */}
+          <div className="pt-ads-platform-section">
+            <h3 className="pt-ads-platform-title">Google Ads</h3>
+            {!googleConnected ? (
+              <div className="pt-ads-connect-card">
+                <p>Connect your Google Ads account to include Google spend in your profit dashboard.</p>
+                <button className="pt-btn pt-btn-primary" onClick={handleConnectGoogle}>
+                  Connect Google Ads
+                </button>
+              </div>
+            ) : (
+              <div className="pt-ads-status">
+                <span className="pt-ads-connected-label">Google Ads connected</span>
+                <button className="pt-btn pt-btn-danger-outline" onClick={() => handleDisconnect('google')}>
+                  Disconnect
+                </button>
+              </div>
+            )}
+          </div>
 
-              {/* Campaign breakdown table */}
-              {campaigns.length > 0 ? (
-                <table className="pt-table">
-                  <thead>
-                    <tr>
-                      <th>Campaign</th>
-                      <th style={{ textAlign: 'right' }}>Spend</th>
+          {/* Blended ROAS card — shown when any platform connected */}
+          {anyConnected && roas !== null && (
+            <div
+              className="pt-kpi-card"
+              style={{ '--kpi-color': 'var(--c-ads)', '--kpi-bg': 'var(--c-ads-bg)', marginBottom: 24 }}
+            >
+              <div className="pt-kpi-label">Blended ROAS</div>
+              <div className="pt-kpi-value" style={{ color: 'var(--c-ads)' }}>{roas}x</div>
+              <div className="pt-kpi-sub">Total revenue / total ad spend &middot; all platforms</div>
+            </div>
+          )}
+
+          {/* Campaign breakdown table */}
+          {anyConnected && (
+            campaigns.length > 0 ? (
+              <table className="pt-table">
+                <thead>
+                  <tr>
+                    <th>Campaign</th>
+                    <th style={{ textAlign: 'right' }}>Spend</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {campaigns.map((c) => (
+                    <tr key={`${c.platform}-${c.campaignId}`}>
+                      <td>
+                        {c.campaignName}{' '}
+                        <span className="pt-ads-platform-badge">{c.platform}</span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {Number(c.spend).toLocaleString('en-US', {
+                          style: 'currency',
+                          currency: 'USD',
+                        })}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {campaigns.map((c) => (
-                      <tr key={c.campaignId}>
-                        <td>{c.campaignName}</td>
-                        <td style={{ textAlign: 'right' }}>
-                          {Number(c.spend).toLocaleString('en-US', {
-                            style: 'currency',
-                            currency: 'USD',
-                          })}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p className="pt-empty-state">
-                  No campaign data for this date range. Sync runs every 6 hours.
-                </p>
-              )}
-            </>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="pt-empty-state">
+                No campaign data for this date range. Sync runs every 6 hours.
+              </p>
+            )
           )}
         </>
       )}

@@ -15,6 +15,7 @@ const { prisma } = require('./lib/prisma');
 const { validateShop } = require('./lib/utils');
 const { startScheduler } = require('./lib/scheduler');
 const { syncIncrementalOrders } = require('./lib/syncOrders');
+const { syncAdSpend } = require('./lib/syncAdSpend');
 const { createBillingSubscription, checkBillingStatus } = require('./routes/billing');
 
 const app = express();
@@ -144,8 +145,9 @@ app.use((err, req, res, _next) => {
 });
 
 // Start 15-minute polling backstop for missed webhooks (SYNC-03)
+// and 6-hour ad spend sync for all AdConnections (ADS-02).
 // Must be called after all routes are mounted so it runs in production
-startScheduler(prisma, syncIncrementalOrders);
+startScheduler(prisma, syncIncrementalOrders, syncAdSpend);
 
 // Start server with graceful shutdown
 const server = app.listen(PORT, () => {

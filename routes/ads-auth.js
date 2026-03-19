@@ -173,7 +173,7 @@ router.get('/callback', async (req, res) => {
     res.redirect(`/admin?shop=${encodeURIComponent(shop)}`);
   } catch (err) {
     console.error('ads/callback error:', err);
-    res.status(500).send('Meta OAuth callback failed');
+    res.status(500).send(`Meta OAuth callback failed: ${err.message}`);
   }
 });
 

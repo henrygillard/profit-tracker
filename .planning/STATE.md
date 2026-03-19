@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Competitive Parity
 status: completed
-stopped_at: Completed 09-google-ads-integration-01-PLAN.md
-last_updated: "2026-03-19T16:03:03.621Z"
+stopped_at: Completed 09-04 Tasks 1+2; awaiting human-verify checkpoint Task 3
+last_updated: "2026-03-19T19:54:26.313Z"
 last_activity: 2026-03-19 — Phase 7 complete (all 3 plans, ALERT-01 through ALERT-04 browser-verified)
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 17
-  completed_plans: 14
+  completed_plans: 17
   percent: 33
 ---
 
@@ -64,6 +64,7 @@ Progress: [█████░░░░░] 33% (3 of 9 phases complete)
 | Phase 08-meta-ads-ads-infrastructure P03 | 5min | 2 tasks | 7 files |
 | Phase 08-meta-ads-ads-infrastructure P04 | 2min | 2 tasks | 5 files |
 | Phase 09-google-ads-integration P01 | 5min | 3 tasks | 7 files |
+| Phase 09-google-ads-integration P04 | 10min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -108,6 +109,8 @@ Recent decisions affecting current work:
 - [Phase 09-google-ads-integration]: google-auth-library@^9.15.1 used (not v10) — Node 16 engine compatibility
 - [Phase 09-google-ads-integration]: OAuth2Client.prototype.getToken spy is correct intercept for google-auth-library token exchange (not global.fetch)
 - [Phase 09-google-ads-integration]: ADS-06 campaigns test passes GREEN immediately — existing groupBy is platform-agnostic, no change needed
+- [Phase 09-google-ads-integration]: metaConnected/googleConnected inferred from spend breakdown and campaign platform field — no dedicated status endpoint (consistent with Phase 08 pattern)
+- [Phase 09-google-ads-integration]: Campaign table row key changed to platform-campaignId composite to prevent collisions when both platforms have campaigns in AdsView
 
 ### Pending Todos
 
@@ -123,6 +126,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T16:03:03.617Z
-Stopped at: Completed 09-google-ads-integration-01-PLAN.md
+Last session: 2026-03-19T19:54:26.308Z
+Stopped at: Completed 09-04 Tasks 1+2; awaiting human-verify checkpoint Task 3
 Resume file: None

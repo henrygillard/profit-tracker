@@ -27,7 +27,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 - [x] **Phase 6: Waterfall Chart** - Store-level and per-order profit waterfall visualization built on verified fee data (completed 2026-03-18)
 - [x] **Phase 7: Margin Alerts** - Configurable low-margin threshold alerts with dashboard banner and nav badge (completed 2026-03-19)
 - [x] **Phase 8: Meta Ads + Ads Infrastructure** - Shared ads schema, token encryption, Meta OAuth, campaign spend sync, and Blended ROAS (completed 2026-03-19)
-- [ ] **Phase 9: Google Ads Integration** - Google OAuth and campaign spend sync built on Phase 8 infrastructure
+- [x] **Phase 9: Google Ads Integration** - Google OAuth and campaign spend sync built on Phase 8 infrastructure (completed 2026-03-19)
 
 ## Phase Details
 
@@ -133,4 +133,4 @@ Plans:
 | 6. Waterfall Chart | 3/3 | Complete   | 2026-03-18 | - |
 | 7. Margin Alerts | 3/3 | Complete   | 2026-03-19 | - |
 | 8. Meta Ads + Ads Infrastructure | 4/4 | Complete   | 2026-03-19 | - |
-| 9. Google Ads Integration | 1/4 | In Progress|  | - |
+| 9. Google Ads Integration | 4/4 | Complete   | 2026-03-19 | - |

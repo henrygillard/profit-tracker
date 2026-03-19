@@ -133,5 +133,5 @@ Plans:
 | 5. Payout Fee Accuracy | v2.0 | 3/3 | Complete | 2026-03-18 |
 | 6. Waterfall Chart | 3/3 | Complete   | 2026-03-18 | - |
 | 7. Margin Alerts | 3/3 | Complete   | 2026-03-19 | - |
-| 8. Meta Ads + Ads Infrastructure | 1/4 | In Progress|  | - |
+| 8. Meta Ads + Ads Infrastructure | 2/4 | In Progress|  | - |
 | 9. Google Ads Integration | v2.0 | 0/TBD | Not started | - |

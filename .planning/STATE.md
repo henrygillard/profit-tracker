@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Competitive Parity
 status: completed
-stopped_at: Completed 08-meta-ads-ads-infrastructure-01-PLAN.md
-last_updated: "2026-03-19T06:02:07.149Z"
+stopped_at: Completed 08-meta-ads-ads-infrastructure-02-PLAN.md
+last_updated: "2026-03-19T06:13:10.932Z"
 last_activity: 2026-03-19 — Phase 7 complete (all 3 plans, ALERT-01 through ALERT-04 browser-verified)
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 13
-  completed_plans: 10
+  completed_plans: 11
   percent: 33
 ---
 
@@ -60,6 +60,7 @@ Progress: [█████░░░░░] 33% (3 of 9 phases complete)
 | Phase 07-margin-alerts P02 | 3min | 2 tasks | 1 files |
 | Phase 07-margin-alerts P03 | 30min | 2 tasks | 5 files |
 | Phase 08-meta-ads-ads-infrastructure P01 | 15min | 2 tasks | 6 files |
+| Phase 08-meta-ads-ads-infrastructure P02 | 8min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -93,6 +94,8 @@ Recent decisions affecting current work:
 - [Phase 08-meta-ads-ads-infrastructure]: AES-256-GCM key loaded lazily inside encrypt/decrypt functions (not at module load) so tests can set ADS_ENCRYPTION_KEY before require without startup throws
 - [Phase 08-meta-ads-ads-infrastructure]: Wave 0 stub pattern: adsAuthRouter/adsApiRouter loaded via try/catch; tests guard with if (!router) expect(false).toBe(true) to stay RED until routes exist
 - [Phase 08-meta-ads-ads-infrastructure]: CHART-05 test passes immediately — computeWaterfallData already handles arbitrary-length steps; no changes to WaterfallChart.jsx needed
+- [Phase 08-meta-ads-ads-infrastructure]: ads-auth router mounted at /ads (not /) in server.js to avoid collision with Shopify OAuth routes
+- [Phase 08-meta-ads-ads-infrastructure]: DELETE /ads/disconnect uses body params in ads-auth.js; JWT-protected DELETE /api/ads/disconnect deferred to Plan 08-03
 
 ### Pending Todos
 
@@ -108,6 +111,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T06:02:07.144Z
-Stopped at: Completed 08-meta-ads-ads-infrastructure-01-PLAN.md
+Last session: 2026-03-19T06:13:10.927Z
+Stopped at: Completed 08-meta-ads-ads-infrastructure-02-PLAN.md
 Resume file: None

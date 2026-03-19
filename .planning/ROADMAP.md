@@ -112,15 +112,14 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 08-01-PLAN.md — Schema migration (AdConnection + AdSpend) + lib/encrypt.js + Wave 0 test stubs
-- [ ] 08-02-PLAN.md — Meta OAuth routes (ads-auth.js) + GDPR webhook extension
-- [ ] 08-03-PLAN.md — Meta Insights sync (syncAdSpend.js) + scheduler + ads API endpoints + overview adSpend field
-- [ ] 08-04-PLAN.md — Frontend: AdsView + Ad Spend KPI card + CHART-05 waterfall step + human checkpoint
+- [ ] 09-01-PLAN.md — Install google-auth-library + Wave 0 failing test stubs (google-ads.test.js + extend syncAdSpend/ads/dashboard tests)
+- [ ] 09-02-PLAN.md — Google OAuth routes (google-ads-auth.js) + server.js mount
+- [ ] 09-03-PLAN.md — Google GAQL sync (syncAdSpend.js Google branch) + disconnect ?platform param + overview metaAdSpend/googleAdSpend/totalAdSpend
+- [ ] 09-04-PLAN.md — Frontend: AdsView Google card + Overview Google Ads Spend KPI card + human checkpoint
 
 **Prerequisites:**
 - Google Ads developer token confirmed at minimum Test Account Access (applied during Phase 8)
-- Run `npm install google-auth-library@10 --dry-run` on Node 16.20.2 before writing any code; fallback to `^9.15.1` if it fails
-- Verify `google-ads-api@23` gRPC native binary compiles on Railway Docker; use REST transport fallback if not
+- google-auth-library v9.15.1 confirmed on Node 16 (Plan 01 Task 1 handles this)
 
 ## Progress
 
@@ -134,4 +133,4 @@ Plans:
 | 6. Waterfall Chart | 3/3 | Complete   | 2026-03-18 | - |
 | 7. Margin Alerts | 3/3 | Complete   | 2026-03-19 | - |
 | 8. Meta Ads + Ads Infrastructure | 4/4 | Complete   | 2026-03-19 | - |
-| 9. Google Ads Integration | v2.0 | 0/TBD | Not started | - |
+| 9. Google Ads Integration | v2.0 | 0/4 | Not started | - |

@@ -29,6 +29,17 @@ const prisma = {
     findFirst: jest.fn().mockResolvedValue(null),
     upsert: jest.fn().mockResolvedValue({}),
   },
+  adConnection: {
+    findFirst: jest.fn().mockResolvedValue(null),
+    findMany: jest.fn().mockResolvedValue([]),
+    upsert: jest.fn().mockResolvedValue({ id: 1, shop: 'test-shop.myshopify.com', platform: 'meta' }),
+    deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+  },
+  adSpend: {
+    upsert: jest.fn().mockResolvedValue({}),
+    groupBy: jest.fn().mockResolvedValue([]),
+    deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+  },
   $queryRaw: jest.fn().mockResolvedValue([]),
   $transaction: jest.fn(ops => Promise.all(ops)),
 };

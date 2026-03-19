@@ -121,3 +121,33 @@ describe('computeWaterfallData', () => {
     }
   });
 });
+
+// CHART-05: 6-step sequence with Ad Spend (Phase 8)
+// computeWaterfallData already handles arbitrary steps — this test validates
+// the existing function accepts the Ad Spend step without modification.
+describe('CHART-05: 6-step sequence with Ad Spend', () => {
+  test('inserts Ad Spend step between Shipping and Net Profit', () => {
+    const steps = [
+      { label: 'Revenue',    value: 1000, type: 'start'    },
+      { label: 'COGS',       value: 300,  type: 'subtract' },
+      { label: 'Fees',       value: 50,   type: 'subtract' },
+      { label: 'Shipping',   value: 20,   type: 'subtract' },
+      { label: 'Ad Spend',   value: 100,  type: 'subtract' },
+      { label: 'Net Profit', value: 530,  type: 'total'    },
+    ];
+
+    const result = computeWaterfallData(steps);
+
+    expect(result).toHaveLength(6);
+
+    // Ad Spend: hangs down from 630 to 530
+    expect(result[4].label).toBe('Ad Spend');
+    expect(result[4].barBottom).toBe(530);
+    expect(result[4].barTop).toBe(630);
+
+    // Net Profit: closing bar anchored to 0, top at 530
+    expect(result[5].label).toBe('Net Profit');
+    expect(result[5].barBottom).toBe(0);
+    expect(result[5].barTop).toBe(530);
+  });
+});

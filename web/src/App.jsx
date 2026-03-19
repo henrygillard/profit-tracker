@@ -5,6 +5,7 @@ import OrdersTable from './components/OrdersTable.jsx';
 import ProductsTable from './components/ProductsTable.jsx';
 import HelpWizard from './components/HelpWizard.jsx';
 import SettingsScreen from './components/SettingsScreen.jsx';
+import AdsView from './components/AdsView.jsx';
 import { apiFetch } from './api.js';
 
 function getDefaultDateRange() {
@@ -29,6 +30,7 @@ const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'orders',   label: 'Orders'   },
   { id: 'products', label: 'Products' },
+  { id: 'ads',      label: 'Ads'      },
   { id: 'settings', label: 'Settings' },
 ];
 
@@ -92,6 +94,7 @@ export default function App() {
     switch (view) {
       case 'orders':   return <OrdersTable dateRange={dateRange} shopDomain={shopDomain} />;
       case 'products': return <ProductsTable dateRange={dateRange} shopDomain={shopDomain} />;
+      case 'ads':      return <AdsView dateRange={dateRange} />;
       case 'settings': return <SettingsScreen />;
       default:
         return (

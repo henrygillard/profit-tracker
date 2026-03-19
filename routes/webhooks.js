@@ -36,8 +36,12 @@ router.post('/app_uninstalled', async (req, res) => {
     const payload = JSON.parse(req.body.toString());
     const shop = payload.myshopify_domain;
     if (shop) {
-      await prisma.shopSession.deleteMany({ where: { shop } });
-      console.log(`Cleaned up sessions for uninstalled shop: ${shop}`);
+      await prisma.$transaction([
+        prisma.shopSession.deleteMany({ where: { shop } }),
+        prisma.adConnection.deleteMany({ where: { shop } }),
+        prisma.adSpend.deleteMany({ where: { shop } }),
+      ]);
+      console.log(`Cleaned up sessions and ad data for uninstalled shop: ${shop}`);
     }
     res.status(200).send('OK');
   } catch (error) {
@@ -83,7 +87,11 @@ router.post('/shop/redact', async (req, res) => {
   try {
     const { myshopify_domain } = JSON.parse(req.body.toString());
     if (myshopify_domain) {
-      await prisma.shopSession.deleteMany({ where: { shop: myshopify_domain } });
+      await prisma.$transaction([
+        prisma.shopSession.deleteMany({ where: { shop: myshopify_domain } }),
+        prisma.adConnection.deleteMany({ where: { shop: myshopify_domain } }),
+        prisma.adSpend.deleteMany({ where: { shop: myshopify_domain } }),
+      ]);
       console.log(`shop/redact: deleted all data for ${myshopify_domain}`);
     }
     res.status(200).send('OK');

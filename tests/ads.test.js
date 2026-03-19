@@ -149,7 +149,7 @@ describe('ADS-01: DELETE /ads/disconnect — remove AdConnection', () => {
 // ---------------------------------------------------------------------------
 
 describe('ADS-02: GET /api/ads/spend — ad spend summary', () => {
-  test('returns { total, platform } for the requested date range', async () => {
+  test('returns { total, revenueNet, roas } for the requested date range (blended)', async () => {
     if (!adsApiRouter) {
       expect(false).toBe(true); // Force failure until Plan 08-03
       return;
@@ -164,8 +164,10 @@ describe('ADS-02: GET /api/ads/spend — ad spend summary', () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
       total: expect.any(Number),
-      platform: expect.any(String),
+      revenueNet: expect.any(Number),
     });
+    // platform field removed in Phase 9 — response is blended across all platforms
+    expect(res.body).not.toHaveProperty('platform');
   });
 });
 

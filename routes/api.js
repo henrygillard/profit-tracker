@@ -195,27 +195,39 @@ router.get('/dashboard/overview', async (req, res) => {
     _count: { _all: true },
   });
 
-  // adSpend: null when no Meta Ads connection, number when connected (ADS-02)
-  // When adSpend is present, subtract from netProfit for true margin view
+  // adSpend: null when no connection, number when connected (ADS-02, ADS-05)
+  // Phase 9: track meta and google separately; subtract totalAdSpend from netProfit
   const shop = req.shopDomain;
   const fromDate = new Date(from);
   const toDate = new Date(to);
 
-  const adConn = await prisma.adConnection.findFirst({
-    where: { shop, platform: 'meta' },
-  });
-  let adSpend = null;
-  if (adConn) {
-    const adRows = await prisma.adSpend.groupBy({
+  const [metaConn, googleConn] = await Promise.all([
+    prisma.adConnection.findFirst({ where: { shop, platform: 'meta' } }),
+    prisma.adConnection.findFirst({ where: { shop, platform: 'google' } }),
+  ]);
+
+  const getSpend = async (platform, conn) => {
+    if (!conn) return null;
+    const rows = await prisma.adSpend.groupBy({
       by: ['platform'],
-      where: { shop, date: { gte: fromDate, lte: toDate } },
+      where: { shop, platform, date: { gte: fromDate, lte: toDate } },
       _sum: { spend: true },
     });
-    adSpend = adRows.reduce((sum, r) => sum + Number(r._sum.spend || 0), 0);
-  }
+    return rows.reduce((s, r) => s + Number(r._sum.spend || 0), 0);
+  };
+
+  const [metaAdSpend, googleAdSpend] = await Promise.all([
+    getSpend('meta', metaConn),
+    getSpend('google', googleConn),
+  ]);
+
+  const connectedSpends = [metaAdSpend, googleAdSpend].filter(v => v !== null);
+  const totalAdSpend = connectedSpends.length > 0
+    ? connectedSpends.reduce((s, v) => s + v, 0)
+    : null;
 
   const baseNetProfit = Number(knownAgg._sum.netProfit ?? 0);
-  const netProfitFinal = adSpend !== null ? baseNetProfit - adSpend : baseNetProfit;
+  const netProfitFinal = totalAdSpend !== null ? baseNetProfit - totalAdSpend : baseNetProfit;
 
   return res.json({
     revenueNet: Number(agg._sum.revenueNet ?? 0),
@@ -227,7 +239,10 @@ router.get('/dashboard/overview', async (req, res) => {
     cogsKnownCount: knownAgg._count._all,
     missingCogsCount: missingCogs,
     isPartial: missingCogs > 0,
-    adSpend,
+    metaAdSpend,
+    googleAdSpend,
+    totalAdSpend,
+    adSpend: totalAdSpend, // backward compat — WaterfallChart reads data.adSpend
   });
 });
 

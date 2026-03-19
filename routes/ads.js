@@ -11,13 +11,13 @@ const { prisma } = require('../lib/prisma');
 /**
  * GET /api/ads/spend?from=&to=
  *
- * Returns ad spend summary for the date range:
- *   { total: number, platform: 'meta', revenueNet: number, roas: number|null }
+ * Returns blended ad spend summary for the date range (all platforms combined):
+ *   { total: number, revenueNet: number, roas: number|null }
  *
- * - total: sum of AdSpend rows for shop + date range
- * - revenueNet: sum of orderProfit.revenueNet (so AdsView can compute Blended ROAS, ADS-07)
+ * - total: sum of AdSpend rows for shop + date range across all platforms (Blended ROAS)
+ * - revenueNet: sum of orderProfit.revenueNet (for ADS-07 Blended ROAS)
  * - roas: revenueNet / total, or null when total = 0 (no division by zero)
- * - Returns { total: 0, platform: 'meta', revenueNet: 0, roas: null } when no rows
+ * - Returns { total: 0, revenueNet: 0, roas: null } when no rows
  */
 router.get('/spend', async (req, res) => {
   const { from, to } = req.query;
@@ -38,9 +38,8 @@ router.get('/spend', async (req, res) => {
       _sum: { spend: true },
     });
 
-    // For Phase 8: report Meta total
-    const metaRow = rows.find(r => r.platform === 'meta');
-    const total = metaRow ? Number(metaRow._sum.spend || 0) : 0;
+    // Blended total: sum ALL platforms (meta + google + any future)
+    const total = rows.reduce((s, r) => s + Number(r._sum.spend || 0), 0);
 
     // Also return revenueNet so AdsView can compute Blended ROAS without a separate fetch (ADS-07)
     const revenueAgg = await prisma.orderProfit.aggregate({
@@ -52,7 +51,7 @@ router.get('/spend', async (req, res) => {
     // Blended ROAS: revenueNet / total (null when no spend to avoid division by zero)
     const roas = total > 0 ? revenueNet / total : null;
 
-    return res.json({ total, platform: 'meta', revenueNet, roas });
+    return res.json({ total, revenueNet, roas });
   } catch (err) {
     console.error('GET /api/ads/spend error:', err);
     return res.status(500).json({ error: 'Failed to fetch ad spend' });

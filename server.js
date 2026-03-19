@@ -61,6 +61,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Routes
 app.use('/', require('./routes/auth'));
+app.use('/ads', require('./routes/ads-auth'));
 app.use('/webhooks', require('./routes/webhooks'));
 
 // JWT-protected API routes — shop identity from token, not query string

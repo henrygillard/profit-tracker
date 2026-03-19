@@ -185,6 +185,28 @@ button { font-family: var(--font); }
   font-weight: 600;
 }
 
+/* Nav badge — at-risk SKU count on Products tab */
+.pt-tab {
+  position: relative;  /* needed for absolute badge positioning */
+}
+
+.pt-tab-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 100px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
+}
+
 .pt-help-btn {
   width: 30px;
   height: 30px;

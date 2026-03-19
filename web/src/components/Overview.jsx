@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { apiFetch } from "../api.js";
 import CogsCoverage from "./CogsCoverage.jsx";
+import MarginAlertBanner from "./MarginAlertBanner.jsx";
 import WaterfallChart from "./WaterfallChart.jsx";
 
 function InfoTooltip({ lines }) {
@@ -122,7 +123,7 @@ const KPI_META = [
   },
 ];
 
-export default function Overview({ dateRange, onDateChange }) {
+export default function Overview({ dateRange, onDateChange, onAtRiskCount }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -202,6 +203,9 @@ export default function Overview({ dateRange, onDateChange }) {
           orderCount={data.orderCount}
         />
       )}
+
+      {/* Margin alert banner */}
+      <MarginAlertBanner dateRange={dateRange} onAtRiskCount={onAtRiskCount ?? (() => {})} />
 
       {/* KPI cards — skeleton while loading */}
       {loading && (

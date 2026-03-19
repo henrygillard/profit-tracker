@@ -4,6 +4,7 @@ import TrendChart from './components/TrendChart.jsx';
 import OrdersTable from './components/OrdersTable.jsx';
 import ProductsTable from './components/ProductsTable.jsx';
 import HelpWizard from './components/HelpWizard.jsx';
+import SettingsScreen from './components/SettingsScreen.jsx';
 import { apiFetch } from './api.js';
 
 function getDefaultDateRange() {
@@ -28,6 +29,7 @@ const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'orders',   label: 'Orders'   },
   { id: 'products', label: 'Products' },
+  { id: 'settings', label: 'Settings' },
 ];
 
 function SunIcon() {
@@ -59,6 +61,7 @@ export default function App() {
   const [view, setView] = useState(getCurrentView);
   const [showHelp, setShowHelp] = useState(false);
   const [shopDomain, setShopDomain] = useState(null);
+  const [atRiskCount, setAtRiskCount] = useState(0);
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('pt-theme') || 'dark';
     document.documentElement.setAttribute('data-theme', saved);
@@ -89,10 +92,11 @@ export default function App() {
     switch (view) {
       case 'orders':   return <OrdersTable dateRange={dateRange} shopDomain={shopDomain} />;
       case 'products': return <ProductsTable dateRange={dateRange} shopDomain={shopDomain} />;
+      case 'settings': return <SettingsScreen />;
       default:
         return (
           <>
-            <Overview dateRange={dateRange} onDateChange={setDateRange} />
+            <Overview dateRange={dateRange} onDateChange={setDateRange} onAtRiskCount={setAtRiskCount} />
             <TrendChart dateRange={dateRange} />
           </>
         );
@@ -110,7 +114,10 @@ export default function App() {
                 className={`pt-tab${view === tab.id ? ' active' : ''}`}
                 onClick={() => handleNav(tab.id)}
               >
-                {tab.label}
+                {tab.id === 'products' && atRiskCount > 0
+                  ? <><span>{tab.label}</span><span className="pt-tab-badge">{atRiskCount}</span></>
+                  : tab.label
+                }
               </button>
             ))}
           </div>

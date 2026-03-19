@@ -131,7 +131,8 @@
       "WebFetch(domain:trackfunnels.com)",
       "WebFetch(domain:developers.google.com)",
       "WebFetch(domain:developers.facebook.com)",
-      "WebFetch(domain:opteo.com)"
+      "WebFetch(domain:opteo.com)",
+      "Bash(git:*)"
     ]
   }
 }

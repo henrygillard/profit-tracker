@@ -31,7 +31,7 @@ router.get('/auth', async (req, res) => {
     const baseUrl = `${process.env.SHOPIFY_APP_URL || ''}/google-ads/auth`;
     const shopParam = shop ? `?shop=${encodeURIComponent(shop)}` : '';
     const redirectUrl = `${baseUrl}${shopParam}`;
-    return res.send(`<!DOCTYPE html><html><head><script>
+    return res.send(`<!DOCTYPE html><html><head></head><body>Redirecting...<script>
       var url = '${redirectUrl}';
       var parts = url.split('?');
       var form = document.createElement('form');
@@ -50,7 +50,7 @@ router.get('/auth', async (req, res) => {
       }
       document.body.appendChild(form);
       form.submit();
-    </script></head><body>Redirecting...</body></html>`);
+    </script></body></html>`);
   }
 
   if (!shop) return res.status(400).send('Missing shop');
